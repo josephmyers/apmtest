@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import TouchTracker from "./TouchTracker";
 import {
   CssBaseline,
   ThemeProvider,
@@ -237,6 +238,7 @@ export default function App() {
           <AppRoutes />
         </AuthProvider>
       </BrowserRouter>
+      <TouchTracker />
     </ThemeProvider>
   );
 }
