@@ -291,14 +291,14 @@ function RecordPageInner() {
         >
           <Box
             sx={{
-              display: "grid",
-              gridTemplateColumns: "1fr auto 1fr",
+              position: "relative",
+              display: "flex",
               alignItems: "center",
               width: "100%",
             }}
           >
-            {/* Passage dropdown */}
-            <Box sx={{ justifySelf: "start", mr: 1 }}>
+            {/* Passage dropdown — always a flex item; sits on top on large screens */}
+            <Box sx={{ flexShrink: 0, position: "relative", zIndex: 1, mr: 1 }}>
               <Button
                 size="small"
                 endIcon={<ArrowDropDownIcon />}
@@ -340,32 +340,40 @@ function RecordPageInner() {
               </Menu>
             </Box>
 
-            {/* Parallelograms — centered in the page */}
+            {/* Parallelograms
+                - Small screens: flex item starting at dropdown edge, scrolls right
+                - Large screens: absolutely spans full row width (behind dropdown) */}
             <Box
               sx={{
                 overflowX: "auto",
-                px: 0.5,
-                minWidth: 0,
+                display: "flex",
+                // small: regular flex item, left-aligned so scroll works correctly
+                flex: { xs: 1, md: "none" },
+                justifyContent: { xs: "flex-start", md: "center" },
+                // large: absolute to cover full width including dropdown
+                position: { md: "absolute" },
+                left: { md: 0 },
+                right: { md: 0 },
               }}
             >
-              <Box sx={{ display: "flex", width: "fit-content", mx: "auto" }}>
-                {STEP_COLORS.map((color, i) => (
-                  <Box
-                    key={i}
-                    sx={{
-                      flex: "0 0 80px",
-                      height: 30,
-                      bgcolor: color,
-                      mx: -0.25,
-                      clipPath: "polygon(10% 0%, 100% 0%, 90% 100%, 0% 100%)",
-                    }}
-                  />
-                ))}
-              </Box>
+              {STEP_COLORS.map((color, i) => (
+                <Box
+                  key={i}
+                  sx={{
+                    flex: "0 0 80px",
+                    height: 30,
+                    bgcolor: color,
+                    mr: -0.25,
+                    clipPath: "polygon(10% 0%, 100% 0%, 90% 100%, 0% 100%)",
+                  }}
+                />
+              ))}
             </Box>
 
-            {/* Empty cell to balance the grid */}
-            <Box />
+            {/* Spacer gives the row its height on large screens (absolute children don't contribute) */}
+            <Box
+              sx={{ height: 30, flex: 1, display: { xs: "none", md: "block" } }}
+            />
           </Box>
           <Typography sx={{ mt: 1, fontWeight: 500 }}>Record</Typography>
         </Box>
