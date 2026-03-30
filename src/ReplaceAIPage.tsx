@@ -8,6 +8,7 @@ import {
   FormControlLabel,
   IconButton,
   Menu,
+  MenuItem,
   Stack,
   Switch,
   Typography,
@@ -368,6 +369,18 @@ export default function ReplaceAIPage() {
     navigate("/record", { state });
   };
 
+  const handleDownloadAudio = () => {
+    const blob = showRendered ? rendered?.blob : (composedAudio ?? audioBlob);
+    if (!blob) return;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${state.passageReference ?? "audio"}.wav`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setMenuAnchorEl(null);
+  };
+
   const handleEditClick = (r: Replacement) => {
     setSelection({
       start: originalToComposedTime(r.selection.start, offsetMapRef.current),
@@ -484,7 +497,9 @@ export default function ReplaceAIPage() {
             anchorEl={menuAnchorEl}
             open={Boolean(menuAnchorEl)}
             onClose={() => setMenuAnchorEl(null)}
-          ></Menu>
+          >
+            <MenuItem onClick={handleDownloadAudio}>Download Audio</MenuItem>
+          </Menu>
         </Box>
       </PageHeader>
 
