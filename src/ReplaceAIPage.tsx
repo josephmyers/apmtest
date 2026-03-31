@@ -161,7 +161,6 @@ export default function ReplaceAIPage() {
         const blob = await fetchVersionAudio(token, renderedVersion.id);
         if (blob) {
           setRendered({ version: renderedVersion, blob });
-          setShowRendered(true);
         }
       });
     }
