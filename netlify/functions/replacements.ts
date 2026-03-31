@@ -47,6 +47,7 @@ export default async function handler(req: Request, _context: Context) {
       const passageId = Number(url.searchParams.get("passageId"));
       const title = url.searchParams.get("title") || "";
       const note = url.searchParams.get("note") || "";
+      const name = url.searchParams.get("name") || "";
       const selectionStart = Number(url.searchParams.get("selectionStart"));
       const selectionEnd = Number(url.searchParams.get("selectionEnd"));
       const original = url.searchParams.get("original") !== "false";
@@ -56,8 +57,8 @@ export default async function handler(req: Request, _context: Context) {
 
       // Insert row first to get the id
       const rows = await sql`
-        INSERT INTO replacements (passage_id, title, note, selection_start, selection_end, original)
-        VALUES (${passageId}, ${title}, ${note}, ${selectionStart}, ${selectionEnd}, ${original})
+        INSERT INTO replacements (passage_id, title, note, name, selection_start, selection_end, original)
+        VALUES (${passageId}, ${title}, ${note}, ${name}, ${selectionStart}, ${selectionEnd}, ${original})
         RETURNING id
       `;
       const id = rows[0].id;
@@ -79,6 +80,7 @@ export default async function handler(req: Request, _context: Context) {
           id,
           title,
           note,
+          name,
           selectionStart,
           selectionEnd,
           original,
@@ -118,7 +120,7 @@ export default async function handler(req: Request, _context: Context) {
       if (!passageId) return jsonRes({ error: "passageId is required" }, 400);
 
       const rows = await sql`
-        SELECT id, title, note, selection_start, selection_end, original
+        SELECT id, title, note, name, selection_start, selection_end, original
         FROM replacements
         WHERE passage_id = ${passageId}
         ORDER BY created_at
@@ -129,6 +131,7 @@ export default async function handler(req: Request, _context: Context) {
           id: r.id,
           title: r.title,
           note: r.note,
+          name: r.name,
           selectionStart: r.selection_start,
           selectionEnd: r.selection_end,
           original: r.original,
@@ -142,6 +145,7 @@ export default async function handler(req: Request, _context: Context) {
       const id = Number(url.searchParams.get("id"));
       const title = url.searchParams.get("title") || "";
       const note = url.searchParams.get("note") || "";
+      const name = url.searchParams.get("name") || "";
       const selectionStart = Number(url.searchParams.get("selectionStart"));
       const selectionEnd = Number(url.searchParams.get("selectionEnd"));
       const originalParam = url.searchParams.get("original");
@@ -152,7 +156,7 @@ export default async function handler(req: Request, _context: Context) {
 
       await sql`
         UPDATE replacements
-        SET title = ${title}, note = ${note},
+        SET title = ${title}, note = ${note}, name = ${name},
             selection_start = ${selectionStart}, selection_end = ${selectionEnd},
             original = ${original}
         WHERE id = ${id}
@@ -170,7 +174,7 @@ export default async function handler(req: Request, _context: Context) {
       }
 
       return jsonRes({
-        replacement: { id, title, note, selectionStart, selectionEnd, original },
+        replacement: { id, title, note, name, selectionStart, selectionEnd, original },
       });
     }
 

@@ -81,6 +81,11 @@ export default async function handler(_req: Request, _context: Context) {
   `;
 
   await sql`
+    ALTER TABLE replacements
+    ADD COLUMN IF NOT EXISTS name VARCHAR(255) NOT NULL DEFAULT ''
+  `;
+
+  await sql`
     CREATE TABLE IF NOT EXISTS passage_versions (
       id SERIAL PRIMARY KEY,
       passage_id INTEGER NOT NULL REFERENCES passages(id) ON DELETE CASCADE,

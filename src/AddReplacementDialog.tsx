@@ -30,12 +30,15 @@ interface AddReplacementDialogProps {
   originalComposedAudio?: Blob;
   /** The selection range from the parent ReplaceAIPage */
   selection: { start: number; end: number };
+  /** The passage speaker */
+  speaker?: string;
   /** Highlight regions from pre-existing replacements (in preview/composed time) */
   existingHighlights?: { start: number; end: number; color: string }[];
   onCancel: () => void;
   onContinue: (data: {
     title: string;
     note: string;
+    name: string;
     selection: { start: number; end: number };
     replacementDuration: number;
     audio: Blob;
@@ -53,6 +56,7 @@ interface AddReplacementDialogProps {
     id: number;
     title: string;
     note: string;
+    name: string;
     audio: Blob;
   }>;
 }
@@ -61,6 +65,7 @@ export default function AddReplacementDialog({
   open,
   originalComposedAudio,
   selection,
+  speaker = "",
   existingHighlights = [],
   onCancel,
   onContinue,
@@ -104,7 +109,7 @@ export default function AddReplacementDialog({
     if (open) {
       setTitle(editData?.title ?? "");
       setNote(editData?.note ?? "");
-      setName("");
+      setName(speaker);
       setSelectedHistoryId(null);
       setReplacementAudio(null);
       setAppliedReplacementAudio(editData?.audio ?? null);
@@ -153,6 +158,7 @@ export default function AddReplacementDialog({
   const handleContinue = () => {
     const trimmedTitle = title.trim();
     const trimmedNote = note.trim();
+    const trimmedName = name.trim();
     const isOriginal = editData
       ? !previousRecordings.some(
           (r) =>
@@ -166,6 +172,7 @@ export default function AddReplacementDialog({
     onContinue({
       title: trimmedTitle,
       note: trimmedNote,
+      name: trimmedName,
       selection: {
         start: stickySelection.start,
         end: originalSegmentEnd ?? stickySelection.end,
@@ -297,6 +304,7 @@ export default function AddReplacementDialog({
                       setSelectedHistoryId(r.id);
                       setTitle(r.title);
                       setNote(r.note);
+                      setName(r.name);
                       setReplacementAudio(r.audio);
                     }}
                     sx={{ height: 36, p: 0 }}

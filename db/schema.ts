@@ -50,6 +50,7 @@ export const replacements = pgTable('replacements', {
     passageId: integer('passage_id').notNull().references(() => passages.id, { onDelete: 'cascade' }),
     title: varchar('title', { length: 255 }).notNull(),
     note: varchar('note', { length: 255 }).notNull().default(''),
+    name: varchar('name', { length: 255 }).notNull().default(''),
     selectionStart: doublePrecision('selection_start').notNull(),
     selectionEnd: doublePrecision('selection_end').notNull(),
     audioKey: varchar('audio_key', { length: 255 }),

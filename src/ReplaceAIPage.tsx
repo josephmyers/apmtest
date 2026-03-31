@@ -55,6 +55,7 @@ interface Replacement {
   id: number;
   title: string;
   note: string;
+  name: string;
   selection: { start: number; end: number };
   audio: Blob;
   original: boolean;
@@ -140,6 +141,7 @@ export default function ReplaceAIPage() {
               id: r.id,
               title: r.title,
               note: r.note,
+              name: r.name,
               selection: { start: r.selectionStart, end: r.selectionEnd },
               audio: audio,
               original: r.original,
@@ -232,6 +234,7 @@ export default function ReplaceAIPage() {
   const handleDialogContinue = async (data: {
     title: string;
     note: string;
+    name: string;
     selection: { start: number; end: number };
     replacementDuration: number;
     audio: Blob;
@@ -264,6 +267,7 @@ export default function ReplaceAIPage() {
           editingReplacement.id,
           data.title,
           data.note,
+          data.name,
           newSelection.start,
           newSelection.end,
           mp3Blob,
@@ -276,6 +280,7 @@ export default function ReplaceAIPage() {
                   ...r,
                   title: data.title,
                   note: data.note,
+                  name: data.name,
                   audio: mp3Blob ?? r.audio,
                   selection: newSelection,
                   original: data.original,
@@ -289,6 +294,7 @@ export default function ReplaceAIPage() {
           passageId,
           data.title,
           data.note,
+          data.name,
           newSelection.start,
           newSelection.end,
           mp3Blob!,
@@ -300,6 +306,7 @@ export default function ReplaceAIPage() {
             id: replacement.id,
             title: data.title,
             note: data.note,
+            name: data.name,
             selection: newSelection,
             audio: mp3Blob!,
             original: data.original,
@@ -421,6 +428,7 @@ export default function ReplaceAIPage() {
           id: r.id,
           title: r.title,
           note: r.note,
+          name: r.name,
           audio: r.audio,
         })),
     [replacements],
@@ -681,6 +689,7 @@ export default function ReplaceAIPage() {
           open={addDialogOpen}
           originalComposedAudio={composedAudio ?? passageAudio?.blob ?? undefined}
           selection={selection}
+          speaker={state.speaker ?? ""}
           existingHighlights={highlights.filter(
             // Filter out the existing highlight when editing a replacement
             (h) => h.start !== selection.start && h.end !== selection.end,

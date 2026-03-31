@@ -221,6 +221,7 @@ export interface ReplacementData {
   id: number;
   title: string;
   note: string;
+  name: string;
   selectionStart: number;
   selectionEnd: number;
   original: boolean;
@@ -231,6 +232,7 @@ export async function saveReplacement(
   passageId: number,
   title: string,
   note: string,
+  name: string,
   selectionStart: number,
   selectionEnd: number,
   audioBlob: Blob,
@@ -240,6 +242,7 @@ export async function saveReplacement(
     passageId: String(passageId),
     title,
     note,
+    name,
     selectionStart: String(selectionStart),
     selectionEnd: String(selectionEnd),
     original: String(original),
@@ -300,6 +303,7 @@ export async function updateReplacement(
   replacementId: number,
   title: string,
   note: string,
+  name: string,
   selectionStart: number,
   selectionEnd: number,
   audioBlob?: Blob,
@@ -309,6 +313,7 @@ export async function updateReplacement(
     id: String(replacementId),
     title,
     note,
+    name,
     selectionStart: String(selectionStart),
     selectionEnd: String(selectionEnd),
   });
