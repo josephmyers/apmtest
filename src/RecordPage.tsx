@@ -25,6 +25,7 @@ import {
   createPassageVersion,
   getPassage,
   listPassageVersions,
+  fetchVersionAudio,
   getSpeakers,
   type Speaker,
   type PassageVersion,
@@ -91,6 +92,10 @@ function RecordPageInner() {
     blob: Blob;
     version: PassageVersion;
   } | null>(null);
+  const [renderSource, setRenderSource] = useState<{
+    blob: Blob;
+    version: PassageVersion;
+  } | null>(null);
   const [recording, setRecording] = useState(false);
   const [warmingUp, setWarmingUp] = useState(false);
   const [compressing, setCompressing] = useState(false);
@@ -133,6 +138,13 @@ function RecordPageInner() {
       const version = versions.find((v) => v.audioKey === passage.audioKey);
       if (!version) return;
       setPassageAudio({ blob, version });
+
+      const renderSourceVersion = versions.find((v) => v.audioKey === version.renderSource);
+      if (renderSourceVersion) {
+        fetchVersionAudio(token, renderSourceVersion.id).then((rsBlob) => {
+          if (rsBlob) setRenderSource({ blob: rsBlob, version: renderSourceVersion });
+        });
+      }
     });
   }, [token, passageId]);
 
@@ -168,6 +180,7 @@ function RecordPageInner() {
 
       // Set audio source for playback
       setPassageAudio({ blob: mp3Blob, version });
+      setRenderSource(null);
       setSnackMsg("Audio saved!");
     } catch (err) {
       setSnackMsg(
@@ -244,6 +257,7 @@ function RecordPageInner() {
       setUploading(true);
       const { version } = await createPassageVersion(token!, passageId, mp3Blob, { activate: true, speaker: selectedSpeaker! });
       setPassageAudio({ blob: mp3Blob, version });
+      setRenderSource(null);
       setSnackMsg("Audio saved!");
     } catch (err) {
       setSnackMsg(
@@ -420,12 +434,12 @@ function RecordPageInner() {
                   projectName,
                   speaker: selectedSpeaker,
                   sectionPassages,
-                  passageVersion: passageAudio?.version ?? null,
+                  passageVersion: renderSource?.version ?? passageAudio?.version ?? null,
                 },
               })
             }
             topRowLabel={
-              passageAudio?.version?.renderSource ? (
+              passageAudio?.version.renderSource ? (
                 <Typography
                   variant="body2"
                   sx={{ color: "success.main", fontWeight: 500 }}
