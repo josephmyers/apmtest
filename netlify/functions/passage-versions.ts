@@ -96,9 +96,16 @@ export default async function handler(req: Request, _context: Context) {
 
       // Optionally activate this version as the passage's current audio
       if (activate) {
-        await sql`
-          UPDATE passages SET audio_key = ${blobKey} WHERE id = ${passageId}
-        `;
+        const speaker = url.searchParams.get("speaker");
+        if (speaker) {
+          await sql`
+            UPDATE passages SET audio_key = ${blobKey}, speaker = ${speaker} WHERE id = ${passageId}
+          `;
+        } else {
+          await sql`
+            UPDATE passages SET audio_key = ${blobKey} WHERE id = ${passageId}
+          `;
+        }
       }
 
       return jsonRes({
@@ -131,9 +138,11 @@ export default async function handler(req: Request, _context: Context) {
     }
 
     // GET /passage-versions?id=123&audio=1 — fetch audio blob for a specific version
+    // GET /passage-versions?passageId=123&audio=1 — fetch the passage's current active audio
     // GET /passage-versions?passageId=123 — list all versions
     if (method === "GET") {
       const versionId = Number(url.searchParams.get("id"));
+      const passageId = Number(url.searchParams.get("passageId"));
       const wantAudio = url.searchParams.get("audio") === "1";
 
       if (versionId && wantAudio) {
@@ -158,9 +167,36 @@ export default async function handler(req: Request, _context: Context) {
         });
       }
 
-      const passageId = Number(url.searchParams.get("passageId"));
       if (!passageId) return jsonRes({ error: "passageId is required" }, 400);
 
+      // Fetch the passage's current active audio blob
+      if (wantAudio) {
+        const [passage] = await sql`
+          SELECT audio_key FROM passages WHERE id = ${passageId}
+        `;
+        if (!passage?.audio_key) {
+          return jsonRes({ error: "No audio found for this passage" }, 404);
+        }
+
+        const blob = await store.get(passage.audio_key, { type: "arrayBuffer" });
+        if (!blob) {
+          return jsonRes({ error: "No audio found for this passage" }, 404);
+        }
+
+        const contentType = String(passage.audio_key).endsWith(".wav")
+          ? "audio/wav"
+          : "audio/mpeg";
+
+        return new Response(blob, {
+          status: 200,
+          headers: {
+            "Content-Type": contentType,
+            "Cache-Control": "private, no-cache",
+          },
+        });
+      }
+
+      // List all versions
       const rows = await sql`
         SELECT id, passage_id, audio_key, render_source, note, created_at
         FROM passage_versions
@@ -178,6 +214,25 @@ export default async function handler(req: Request, _context: Context) {
           createdAt: r.created_at,
         })),
       });
+    }
+
+    // DELETE /passage-versions?passageId=123 — remove the passage's current audio
+    if (method === "DELETE") {
+      const passageId = Number(url.searchParams.get("passageId"));
+      if (!passageId) return jsonRes({ error: "passageId is required" }, 400);
+
+      const [passage] = await sql`
+        SELECT audio_key FROM passages WHERE id = ${passageId}
+      `;
+      if (passage?.audio_key) {
+        await store.delete(passage.audio_key);
+      }
+
+      await sql`
+        UPDATE passages SET audio_key = NULL WHERE id = ${passageId}
+      `;
+
+      return jsonRes({ success: true });
     }
 
     return jsonRes({ error: "Method not allowed" }, 405);

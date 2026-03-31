@@ -177,45 +177,11 @@ export async function renamePassage(
   return data;
 }
 
-export async function uploadAudio(
-  token: string,
-  passageId: number,
-  mp3Blob: Blob,
-  speaker: string
-): Promise<{ success: boolean; audioKey: string }> {
-  const params = new URLSearchParams({ passageId: String(passageId) });
-  if (speaker) params.set("speaker", speaker);
-  const res = await fetch(`${API_BASE}/audio?${params}`, {
-    method: "PUT",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-    body: mp3Blob,
-  });
-  if (!res.ok) {
-    // Netlify may return plain text "Internal Error" for oversized payloads
-    const text = await res.text();
-    let message = "Failed to upload audio";
-    try {
-      const json = JSON.parse(text);
-      message = json.error || message;
-    } catch {
-      message = text || message;
-    }
-    throw new Error(message);
-  }
-  return await res.json();
-}
-
-export function getAudioUrl(passageId: number): string {
-  return `${API_BASE}/audio?passageId=${passageId}`;
-}
-
 export async function fetchAudio(
   token: string,
   passageId: number
 ): Promise<Blob | null> {
-  const res = await fetch(`${API_BASE}/audio?passageId=${passageId}`, {
+  const res = await fetch(`${API_BASE}/passage-versions?passageId=${passageId}&audio=1`, {
     headers: { Authorization: `Bearer ${token}` },
     cache: "no-store",
   });
@@ -375,6 +341,7 @@ export async function createPassageVersion(
   options?: {
     renderSource?: boolean;
     activate?: boolean;
+    speaker?: string;
   },
 ): Promise<{ version: PassageVersion }> {
   const params = new URLSearchParams({
@@ -383,6 +350,7 @@ export async function createPassageVersion(
   // Pass renderSource="" to signal "auto-populate from current passage audio_key"
   if (options?.renderSource) params.set("renderSource", "");
   if (options?.activate === false) params.set("activate", "0");
+  if (options?.speaker) params.set("speaker", options.speaker);
   const res = await fetch(`${API_BASE}/passage-versions?${params}`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },

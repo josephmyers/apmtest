@@ -21,7 +21,6 @@ import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 
 import { useAuth } from "./AuthContext";
 import {
-  uploadAudio,
   fetchAudio,
   createPassageVersion,
   getPassage,
@@ -165,8 +164,7 @@ function RecordPageInner() {
 
       setCompressing(false);
       setUploading(true);
-      await uploadAudio(token, passageId, mp3Blob, selectedSpeaker!);
-      const { version } = await createPassageVersion(token!, passageId, mp3Blob);
+      const { version } = await createPassageVersion(token, passageId, mp3Blob, { activate: true, speaker: selectedSpeaker! });
 
       // Set audio source for playback
       setPassageAudio({ blob: mp3Blob, version });
@@ -244,8 +242,7 @@ function RecordPageInner() {
 
       setCompressing(false);
       setUploading(true);
-      await uploadAudio(token!, passageId, mp3Blob, selectedSpeaker!);
-      const { version } = await createPassageVersion(token!, passageId, mp3Blob);
+      const { version } = await createPassageVersion(token!, passageId, mp3Blob, { activate: true, speaker: selectedSpeaker! });
       setPassageAudio({ blob: mp3Blob, version });
       setSnackMsg("Audio saved!");
     } catch (err) {
