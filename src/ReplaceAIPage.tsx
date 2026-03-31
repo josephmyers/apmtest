@@ -25,7 +25,9 @@ import {
   createPassageVersion,
   fetchAudio,
   fetchReplacementAudio,
+  fetchVersionAudio,
   getReplacements,
+  listPassageVersions,
   saveReplacement,
   updateReplacement,
   deleteReplacement,
@@ -44,7 +46,9 @@ interface ReplaceAIPageState {
   passageReference: string;
   projectName: string;
   speaker?: string | null;
+  //todo remove?
   sectionPassages?: { id: number; reference: string; speaker: string | null }[];
+  passageVersion?: PassageVersion | null;
 }
 
 interface Replacement {
@@ -92,9 +96,13 @@ export default function ReplaceAIPage() {
 
   const passageId = state.passageId ?? 0;
   const projectName = state.projectName ?? "";
+  const passageVersion = state.passageVersion ?? null;
 
   const playerRef = useRef<AudioPlayerHandle>(null);
-  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [passageAudio, setPassageAudio] = useState<{
+    blob: Blob;
+    version: PassageVersion | null;
+  } | null>(null);
   const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
   const [selection, setSelection] = useState<{
     start: number;
@@ -115,12 +123,13 @@ export default function ReplaceAIPage() {
   >([]);
   const offsetMapRef = useRef<OffsetEntry[]>([]);
 
-  // Load passage audio and existing replacements on mount
+  // Load passage audio, rendered audio, and existing replacements on mount
   useEffect(() => {
     if (!token || !passageId) return;
     fetchAudio(token, passageId).then((blob) => {
-      if (blob) setAudioBlob(blob);
+      if (blob) setPassageAudio({ blob, version: passageVersion });
     });
+
     getReplacements(token, passageId).then(
       async ({ replacements: repData }) => {
         const withAudio = await Promise.all(
@@ -140,11 +149,25 @@ export default function ReplaceAIPage() {
         setReplacements(withAudio.filter((r) => r !== undefined));
       },
     );
+
+    if (passageVersion?.audioKey) {
+      listPassageVersions(token, passageId).then(async ({ versions }) => {
+        const renderedVersion = versions.find(
+          (v) => v.renderSource === passageVersion.audioKey,
+        );
+        if (!renderedVersion) return;
+        const blob = await fetchVersionAudio(token, renderedVersion.id);
+        if (blob) {
+          setRendered({ version: renderedVersion, blob });
+          setShowRendered(true);
+        }
+      });
+    }
   }, [token, passageId]);
 
   // Compose all replacement clips into the passage audio
   useEffect(() => {
-    if (!audioBlob || replacements.length === 0) {
+    if (!passageAudio || replacements.length === 0) {
       setComposedAudio(null);
       setHighlights([]);
       offsetMapRef.current = [];
@@ -158,7 +181,7 @@ export default function ReplaceAIPage() {
         (a, b) => a.selection.start - b.selection.start,
       );
 
-      let current = audioBlob;
+      let current = passageAudio.blob;
       let offset = 0;
       const newHighlights: { start: number; end: number; color: string }[] = [];
       const newOffsetMap: OffsetEntry[] = [];
@@ -198,7 +221,7 @@ export default function ReplaceAIPage() {
     return () => {
       cancelled = true;
     };
-  }, [audioBlob, replacements]);
+  }, [passageAudio, replacements]);
 
   const handleBack = () => navigate("/dashboard");
 
@@ -327,8 +350,8 @@ export default function ReplaceAIPage() {
   };
 
   const renderReplacements = async () => {
-    if (!audioBlob) return;
-    const file = new File([audioBlob], "passage.wav", { type: audioBlob.type });
+    if (!passageAudio) return;
+    const file = new File([passageAudio.blob], "passage.wav", { type: passageAudio.blob.type });
     setRendering(true);
     try {
       const base64String = await toBase64(file);
@@ -370,7 +393,7 @@ export default function ReplaceAIPage() {
   };
 
   const handleDownloadAudio = () => {
-    const blob = showRendered ? rendered?.blob : (composedAudio ?? audioBlob);
+    const blob = showRendered ? rendered?.blob : (composedAudio ?? passageAudio?.blob);
     if (!blob) return;
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -520,7 +543,7 @@ export default function ReplaceAIPage() {
           audioSource={
             showRendered
               ? rendered!.blob
-              : (composedAudio ?? audioBlob ?? undefined)
+              : (composedAudio ?? passageAudio?.blob ?? undefined)
           }
           height={80}
           enableDragSelection
@@ -656,7 +679,7 @@ export default function ReplaceAIPage() {
       {selection && (
         <AddReplacementDialog
           open={addDialogOpen}
-          originalComposedAudio={composedAudio ?? audioBlob ?? undefined}
+          originalComposedAudio={composedAudio ?? passageAudio?.blob ?? undefined}
           selection={selection}
           existingHighlights={highlights.filter(
             // Filter out the existing highlight when editing a replacement

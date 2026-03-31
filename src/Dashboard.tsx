@@ -536,7 +536,7 @@ function SectionRow({
                 {addPassageMode && (
                   <InsertSlot
                     onClick={() =>
-                      onInsertPassage(section.id, passage.sort_order + 1)
+                      onInsertPassage(section.id, passage.sortOrder + 1)
                     }
                   />
                 )}

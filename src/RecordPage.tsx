@@ -24,9 +24,11 @@ import {
   uploadAudio,
   fetchAudio,
   createPassageVersion,
+  getPassage,
+  listPassageVersions,
   getSpeakers,
-  getPassageSpeaker,
   type Speaker,
+  type PassageVersion,
 } from "./api";
 import { compressToMp3 } from "./audioUtils";
 import SpeakerDialog from "./SpeakerDialog";
@@ -86,7 +88,10 @@ function RecordPageInner() {
   // Audio state
   const fileInputRef = useRef<HTMLInputElement>(null);
   const playerRef = useRef<AudioPlayerHandle>(null);
-  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [passageAudio, setPassageAudio] = useState<{
+    blob: Blob;
+    version: PassageVersion;
+  } | null>(null);
   const [recording, setRecording] = useState(false);
   const [warmingUp, setWarmingUp] = useState(false);
   const [compressing, setCompressing] = useState(false);
@@ -112,24 +117,23 @@ function RecordPageInner() {
       });
   }, [token]);
 
-  // Load existing audio for this passage on mount
-  useEffect(() => {
-    if (!token || !passageId) return;
-    fetchAudio(token, passageId).then((blob) => {
-      if (blob) setAudioBlob(blob);
-    });
-  }, [token, passageId]);
-
-  // Load saved speaker for this passage on mount
+  // Load existing audio, passage details, and versions on mount
   useEffect(() => {
     if (!token || !passageId) return;
     // Use nav-state speaker as fast initial value
     if (state.speaker) {
       setSelectedSpeaker(state.speaker);
     }
-    // Always confirm from the server
-    getPassageSpeaker(token, passageId).then((name) => {
-      if (name) setSelectedSpeaker(name);
+    Promise.all([
+      fetchAudio(token, passageId),
+      getPassage(token, passageId),
+      listPassageVersions(token, passageId),
+    ]).then(([blob, { passage }, { versions }]) => {
+      if (passage.speaker) setSelectedSpeaker(passage.speaker);
+      if (!blob) return;
+      const version = versions.find((v) => v.audioKey === passage.audioKey);
+      if (!version) return;
+      setPassageAudio({ blob, version });
     });
   }, [token, passageId]);
 
@@ -162,10 +166,10 @@ function RecordPageInner() {
       setCompressing(false);
       setUploading(true);
       await uploadAudio(token, passageId, mp3Blob, selectedSpeaker!);
-      await createPassageVersion(token!, passageId, mp3Blob);
+      const { version } = await createPassageVersion(token!, passageId, mp3Blob);
 
       // Set audio source for playback
-      setAudioBlob(mp3Blob);
+      setPassageAudio({ blob: mp3Blob, version });
       setSnackMsg("Audio saved!");
     } catch (err) {
       setSnackMsg(
@@ -224,8 +228,6 @@ function RecordPageInner() {
   }
 
   async function handleRecordingComplete(blob: Blob) {
-    // Set blob for immediate playback (AudioPlayer already rendered it)
-    setAudioBlob(blob);
     // Compress and upload
     try {
       setCompressing(true);
@@ -243,8 +245,8 @@ function RecordPageInner() {
       setCompressing(false);
       setUploading(true);
       await uploadAudio(token!, passageId, mp3Blob, selectedSpeaker!);
-      await createPassageVersion(token!, passageId, mp3Blob);
-      setAudioBlob(mp3Blob);
+      const { version } = await createPassageVersion(token!, passageId, mp3Blob);
+      setPassageAudio({ blob: mp3Blob, version });
       setSnackMsg("Audio saved!");
     } catch (err) {
       setSnackMsg(
@@ -409,7 +411,7 @@ function RecordPageInner() {
         <Box sx={{ px: 2 }}>
           <AudioPlayer
             ref={playerRef}
-            audioSource={audioBlob ?? undefined}
+            audioSource={passageAudio?.blob ?? undefined}
             height={80}
             enableDragSelection
             onRecordingComplete={handleRecordingComplete}
@@ -421,6 +423,7 @@ function RecordPageInner() {
                   projectName,
                   speaker: selectedSpeaker,
                   sectionPassages,
+                  passageVersion: passageAudio?.version ?? null,
                 },
               })
             }

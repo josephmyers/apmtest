@@ -11,11 +11,13 @@ interface MeResponse {
 
 export interface Passage {
   id: number;
-  section_id: number;
+  sectionId: number;
   reference: string;
   description: string;
-  sort_order: number;
+  sortOrder: number;
+  audioKey: string | null;
   speaker: string | null;
+  createdAt: string;
 }
 
 export interface Section {
@@ -237,16 +239,16 @@ export async function getSpeakers(
   return data;
 }
 
-export async function getPassageSpeaker(
+export async function getPassage(
   token: string,
-  passageId: number
-): Promise<string | null> {
-  const res = await fetch(`${API_BASE}/passage-speaker?passageId=${passageId}`, {
+  passageId: number,
+): Promise<{ passage: Passage}> {
+  const res = await fetch(`${API_BASE}/passage?passageId=${passageId}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!res.ok) return null;
   const data = await res.json();
-  return data.speaker ?? null;
+  if (!res.ok) throw new Error(data.error || "Failed to fetch passage");
+  return data;
 }
 
 export interface ReplacementData {
@@ -417,6 +419,18 @@ export async function fetchVersionAudio(
   );
   if (res.status === 404 || !res.ok) return null;
   return await res.blob();
+}
+
+export async function listPassageVersions(
+  token: string,
+  passageId: number,
+): Promise<{ versions: PassageVersion[] }> {
+  const res = await fetch(`${API_BASE}/passage-versions?passageId=${passageId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Failed to fetch passage versions");
+  return data;
 }
 
 export async function createSpeaker(
