@@ -275,7 +275,7 @@ export default function AddReplacementDialog({
         {/* ─── Previous Replacement Recordings ──────────────── */}
         <Accordion
           variant="outlined"
-          disabled={!!editData || previousRecordings.length === 0}
+          disabled={previousRecordings.length === 0}
           expanded={historyExpanded}
           onChange={(_, expanded) => setHistoryExpanded(expanded)}
           sx={{ mt: 2 }}
