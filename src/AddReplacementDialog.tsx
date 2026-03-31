@@ -282,7 +282,7 @@ export default function AddReplacementDialog({
         >
           <AccordionSummary expandIcon={<ExpandMore />}>
             <Typography>
-              Previous Recordings
+              Previous Replacements
             </Typography>
           </AccordionSummary>
           <AccordionDetails sx={{ p: 0 }}>
