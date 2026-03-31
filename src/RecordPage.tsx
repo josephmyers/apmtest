@@ -424,6 +424,16 @@ function RecordPageInner() {
                 },
               })
             }
+            topRowLabel={
+              passageAudio?.version?.renderSource ? (
+                <Typography
+                  variant="body2"
+                  sx={{ color: "success.main", fontWeight: 500 }}
+                >
+                  AI-Rendered
+                </Typography>
+              ) : undefined
+            }
           />
         </Box>
 

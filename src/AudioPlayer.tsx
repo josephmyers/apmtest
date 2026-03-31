@@ -121,6 +121,9 @@ export interface AudioPlayerProps {
 
   /** Children rendered below the waveform (e.g. helper text) */
   children?: React.ReactNode;
+
+  /** Optional label rendered on the top row (after time display) */
+  topRowLabel?: React.ReactNode;
 }
 
 /* ------------------------------------------------------------------ */
@@ -152,6 +155,7 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
       highlights = [],
       enableZoom = true,
       children,
+      topRowLabel,
     },
     ref,
   ) => {
@@ -738,6 +742,7 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
             {timeText}
           </Typography>
           <Box sx={{ flexGrow: 1 }} />
+          {topRowLabel}
           {showUndo && undoStack.length > 0 && (
             <IconButton
               disabled={undoStack.length === 0}
