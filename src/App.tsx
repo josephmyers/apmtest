@@ -104,8 +104,7 @@ const theme = createTheme({
               background: "#555",
             },
             "&:disabled": {
-              background: "#e0e0e0",
-              color: "#999",
+              background: "#f0f0f0",
             },
           },
         },
@@ -118,8 +117,7 @@ const theme = createTheme({
               background: darken(PRIMARY_MAIN, 0.12),
             },
             "&:disabled": {
-              background: "#e0e0e0",
-              color: "#999",
+              background: "#f0f0f0",
             },
           },
         },
