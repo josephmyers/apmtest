@@ -150,7 +150,7 @@ export default function ReplaceAIPage() {
   }, [replacements, savedReplacements, rendered]);
 
   useEffect(() => {
-    if (!rendered || !haveReplacementsChanged) return;
+    if (!haveReplacementsChanged) return;
     const handler = (e: BeforeUnloadEvent) => {
       e.preventDefault();
     };
