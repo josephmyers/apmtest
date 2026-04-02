@@ -51,14 +51,17 @@ export default async function handler(req: Request, _context: Context) {
       const selectionStart = Number(url.searchParams.get("selectionStart"));
       const selectionEnd = Number(url.searchParams.get("selectionEnd"));
       const original = url.searchParams.get("original") !== "false";
+      const versionId = url.searchParams.get("versionId")
+        ? Number(url.searchParams.get("versionId"))
+        : null;
 
       if (!passageId) return jsonRes({ error: "passageId is required" }, 400);
       if (!title) return jsonRes({ error: "title is required" }, 400);
 
       // Insert row first to get the id
       const rows = await sql`
-        INSERT INTO replacements (passage_id, title, note, name, selection_start, selection_end, original)
-        VALUES (${passageId}, ${title}, ${note}, ${name}, ${selectionStart}, ${selectionEnd}, ${original})
+        INSERT INTO replacements (passage_id, title, note, name, selection_start, selection_end, original, version_id)
+        VALUES (${passageId}, ${title}, ${note}, ${name}, ${selectionStart}, ${selectionEnd}, ${original}, ${versionId})
         RETURNING id
       `;
       const id = rows[0].id;
@@ -120,7 +123,7 @@ export default async function handler(req: Request, _context: Context) {
       if (!passageId) return jsonRes({ error: "passageId is required" }, 400);
 
       const rows = await sql`
-        SELECT id, title, note, name, selection_start, selection_end, original
+        SELECT id, title, note, name, selection_start, selection_end, original, version_id
         FROM replacements
         WHERE passage_id = ${passageId}
         ORDER BY created_at
@@ -135,6 +138,7 @@ export default async function handler(req: Request, _context: Context) {
           selectionStart: r.selection_start,
           selectionEnd: r.selection_end,
           original: r.original,
+          versionId: r.version_id ?? null,
         })),
       });
     }
@@ -193,6 +197,21 @@ export default async function handler(req: Request, _context: Context) {
 
       await sql`DELETE FROM replacements WHERE id = ${id}`;
 
+      return jsonRes({ success: true });
+    }
+
+    // PATCH /replacements?passageId=1&versionId=5
+    // Bulk-associate all unversioned replacements for a passage with a version
+    if (method === "PATCH") {
+      const passageId = Number(url.searchParams.get("passageId"));
+      const versionId = Number(url.searchParams.get("versionId"));
+      if (!passageId) return jsonRes({ error: "passageId is required" }, 400);
+      if (!versionId) return jsonRes({ error: "versionId is required" }, 400);
+
+      await sql`
+        UPDATE replacements SET version_id = ${versionId}
+        WHERE passage_id = ${passageId} AND version_id IS NULL
+      `;
       return jsonRes({ success: true });
     }
 

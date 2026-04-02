@@ -225,6 +225,7 @@ export interface ReplacementData {
   selectionStart: number;
   selectionEnd: number;
   original: boolean;
+  versionId: number | null;
 }
 
 export async function saveReplacement(
@@ -237,6 +238,7 @@ export async function saveReplacement(
   selectionEnd: number,
   audioBlob: Blob,
   original: boolean,
+  versionId?: number,
 ): Promise<{ replacement: ReplacementData }> {
   const params = new URLSearchParams({
     passageId: String(passageId),
@@ -247,6 +249,7 @@ export async function saveReplacement(
     selectionEnd: String(selectionEnd),
     original: String(original),
   });
+  if (versionId !== undefined) params.set("versionId", String(versionId));
   const res = await fetch(`${API_BASE}/replacements?${params}`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
@@ -254,6 +257,20 @@ export async function saveReplacement(
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "Failed to save replacement");
+  return data;
+}
+
+export async function associateReplacementsWithVersion(
+  token: string,
+  passageId: number,
+  versionId: number,
+): Promise<{ success: boolean }> {
+  const res = await fetch(
+    `${API_BASE}/replacements?passageId=${passageId}&versionId=${versionId}`,
+    { method: "PATCH", headers: { Authorization: `Bearer ${token}` } },
+  );
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Failed to associate replacements");
   return data;
 }
 
@@ -344,7 +361,7 @@ export async function createPassageVersion(
   passageId: number,
   blob: Blob,
   options?: {
-    renderSource?: boolean;
+    renderSource?: string;
     activate?: boolean;
     speaker?: string;
   },
@@ -352,8 +369,7 @@ export async function createPassageVersion(
   const params = new URLSearchParams({
     passageId: String(passageId),
   });
-  // Pass renderSource="" to signal "auto-populate from current passage audio_key"
-  if (options?.renderSource) params.set("renderSource", "");
+  if (options?.renderSource) params.set("renderSource", options.renderSource);
   if (options?.activate === false) params.set("activate", "0");
   if (options?.speaker) params.set("speaker", options.speaker);
   const res = await fetch(`${API_BASE}/passage-versions?${params}`, {

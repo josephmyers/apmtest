@@ -22,8 +22,8 @@ import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import { useAuth } from "./AuthContext";
 import {
   activatePassageVersion,
+  associateReplacementsWithVersion,
   createPassageVersion,
-  fetchAudio,
   fetchReplacementAudio,
   fetchVersionAudio,
   getReplacements,
@@ -117,6 +117,7 @@ export default function ReplaceAIPage() {
   const [rendering, setRendering] = useState(false);
   const [rendered, setRendered] = useState<{ version: PassageVersion; blob: Blob } | null>(null);
   const [showRendered, setShowRendered] = useState(false);
+  const [savedReplacements, setSavedReplacements] = useState<Replacement[]>([]);
 
   const [composedAudio, setComposedAudio] = useState<Blob | null>(null);
   const [highlights, setHighlights] = useState<
@@ -124,46 +125,80 @@ export default function ReplaceAIPage() {
   >([]);
   const offsetMapRef = useRef<OffsetEntry[]>([]);
 
+  const haveReplacementsChanged = useMemo(() => {
+    if (!rendered) return false;
+    if (replacements.length !== savedReplacements.length) return true;
+    const savedById = new Map(savedReplacements.map((r) => [r.id, r]));
+    return replacements.some((r) => {
+      const s = savedById.get(r.id);
+      if (!s) return true;
+      return (
+        r.title !== s.title ||
+        r.note !== s.note ||
+        r.name !== s.name ||
+        r.selection.start !== s.selection.start ||
+        r.selection.end !== s.selection.end ||
+        r.original !== s.original ||
+        r.audio !== s.audio
+      );
+    });
+  }, [replacements, savedReplacements, rendered]);
+
   // Load passage audio, rendered audio, and existing replacements on mount
   useEffect(() => {
     if (!token || !passageId) return;
-    fetchAudio(token, passageId).then((blob) => {
+    fetchVersionAudio(token, passageVersion?.id ?? passageId).then((blob) => {
       if (blob) setPassageAudio({ blob, version: passageVersion });
     });
 
-    getReplacements(token, passageId).then(
-      async ({ replacements: repData }) => {
-        const withAudio = await Promise.all(
-          repData.map(async (r) => {
-            const audio = await fetchReplacementAudio(token, r.id);
-            if (!audio) return undefined;
-            return {
-              id: r.id,
-              title: r.title,
-              note: r.note,
-              name: r.name,
-              selection: { start: r.selectionStart, end: r.selectionEnd },
-              audio: audio,
-              original: r.original,
-            };
-          }),
-        );
-        setReplacements(withAudio.filter((r) => r !== undefined));
-      },
-    );
+    Promise.all([
+      getReplacements(token, passageId),
+      listPassageVersions(token, passageId),
+    ]).then(async ([{ replacements: repData }, { versions }]) => {
+      // Determine which replacements to display:
+      // unversioned (before any renders) takes priority; otherwise use latest version
+      const unversioned = repData.filter((r) => r.versionId === null);
+      let targets: typeof repData;
+      if (unversioned.length > 0) {
+        targets = unversioned;
+      } else if (versions.length > 0) { // this should always be true
+        // versions is ordered DESC by created_at, so versions[0] is latest
+        const latestId = versions[0].id;
+        targets = repData.filter((r) => r.versionId === latestId);
+      } else {
+        targets = [];
+      }
 
-    if (passageVersion?.audioKey) {
-      listPassageVersions(token, passageId).then(async ({ versions }) => {
-        const renderedVersion = versions.find(
+      const withAudio = await Promise.all(
+        targets.map(async (r) => {
+          const audio = await fetchReplacementAudio(token, r.id);
+          if (!audio) return undefined;
+          return {
+            id: r.id,
+            title: r.title,
+            note: r.note,
+            name: r.name,
+            selection: { start: r.selectionStart, end: r.selectionEnd },
+            audio,
+            original: r.original,
+          };
+        }),
+      );
+      const replacementsFromDB = withAudio.filter((r) => r !== undefined) as Replacement[];
+      setReplacements(replacementsFromDB);
+      setSavedReplacements(replacementsFromDB);
+
+      // Detect rendered version
+      if (passageVersion?.audioKey) {
+        const versionWithPassageAsSource = versions.find(
           (v) => v.renderSource === passageVersion.audioKey,
         );
-        if (!renderedVersion) return;
-        const blob = await fetchVersionAudio(token, renderedVersion.id);
-        if (blob) {
-          setRendered({ version: renderedVersion, blob });
+        if (versionWithPassageAsSource) {
+          const blob = await fetchVersionAudio(token, versionWithPassageAsSource.id);
+          if (blob) setRendered({ version: versionWithPassageAsSource, blob });
         }
-      });
-    }
+      }
+    });
   }, [token, passageId]);
 
   // Compose all replacement clips into the passage audio
@@ -239,97 +274,100 @@ export default function ReplaceAIPage() {
     audio: Blob;
     original: boolean;
   }) => {
-    setSaving(true);
-    try {
-      const isEdit = !!editingReplacement;
-      const newSelection = {
-        start: composedToOriginalTime(
-          data.selection.start,
-          offsetMapRef.current,
-        ),
-        end: composedToOriginalTime(data.selection.end, offsetMapRef.current),
-      };
+    const editing = !!editingReplacement;
+    const newSelection = {
+      start: composedToOriginalTime(data.selection.start, offsetMapRef.current),
+      end: composedToOriginalTime(data.selection.end, offsetMapRef.current),
+    };
+    const audioChanged = !editing || data.audio !== editingReplacement!.audio;
+    const audioToStore = audioChanged
+      ? await compressToMp3(
+          new File([data.audio], "replacement.webm", { type: data.audio.type }),
+          64,
+        )
+      : editingReplacement!.audio;
 
-      const audioChanged = !isEdit || data.audio !== editingReplacement.audio;
-      const mp3Blob = audioChanged
-        ? await compressToMp3(
-            new File([data.audio], "replacement.webm", {
-              type: data.audio.type,
-            }),
-            64,
-          )
-        : undefined;
-
-      if (isEdit) {
-        const { replacement } = await updateReplacement(
-          token!,
-          editingReplacement.id,
-          data.title,
-          data.note,
-          data.name,
-          newSelection.start,
-          newSelection.end,
-          mp3Blob,
-          data.original,
-        );
-        setReplacements((prev) =>
-          prev.map((r) =>
-            r.id === replacement.id
-              ? {
-                  ...r,
-                  title: data.title,
-                  note: data.note,
-                  name: data.name,
-                  audio: mp3Blob ?? r.audio,
-                  selection: newSelection,
-                  original: data.original,
-                }
-              : r,
-          ),
-        );
-      } else {
-        const { replacement } = await saveReplacement(
-          token!,
-          passageId,
-          data.title,
-          data.note,
-          data.name,
-          newSelection.start,
-          newSelection.end,
-          mp3Blob!,
-          data.original,
-        );
-        setReplacements((prev) => [
-          ...prev,
-          {
-            id: replacement.id,
-            title: data.title,
-            note: data.note,
-            name: data.name,
-            selection: newSelection,
-            audio: mp3Blob!,
-            original: data.original,
-          },
-        ]);
+    let newId = -(Date.now()); // temp ID for deferred adds; overwritten by DB response below
+    if (!rendered) { // update DB immediately
+      setSaving(true);
+      try {
+        if (editing) {
+          await updateReplacement(
+            token!,
+            editingReplacement!.id,
+            data.title,
+            data.note,
+            data.name,
+            newSelection.start,
+            newSelection.end,
+            audioChanged ? audioToStore : undefined,
+            data.original,
+          );
+        } else {
+          const { replacement } = await saveReplacement(
+            token!,
+            passageId,
+            data.title,
+            data.note,
+            data.name,
+            newSelection.start,
+            newSelection.end,
+            audioToStore,
+            data.original,
+          );
+          newId = replacement.id;
+        }
+      } catch {
+        setSaving(false);
+        return; // save/update failed — dialog stays open
       }
-
-      playerRef.current?.updateSelection({
-        start: data.selection.start,
-        end: data.selection.start + data.replacementDuration,
-      });
-      setAddDialogOpen(false);
-      setEditingReplacement(null);
-    } catch {
-      // save/update failed — dialog stays open
-    } finally {
       setSaving(false);
     }
+
+    // update the UI
+    if (editing) {
+      setReplacements((prev) =>
+        prev.map((r) =>
+          r.id === editingReplacement!.id
+            ? {
+                ...r,
+                title: data.title,
+                note: data.note,
+                name: data.name,
+                selection: newSelection,
+                audio: audioToStore,
+                original: data.original,
+              }
+            : r,
+        ),
+      );
+    } else {
+      setReplacements((prev) => [
+        ...prev,
+        {
+          id: newId,
+          title: data.title,
+          note: data.note,
+          name: data.name,
+          selection: newSelection,
+          audio: audioToStore,
+          original: data.original,
+        },
+      ]);
+    }
+    playerRef.current?.updateSelection({
+      start: data.selection.start,
+      end: data.selection.start + data.replacementDuration,
+    });
+    setAddDialogOpen(false);
+    setEditingReplacement(null);
   };
 
   const handleDeleteReplacement = async (id: number) => {
     setSaving(true);
     try {
-      await deleteReplacement(token!, id);
+      // defer delete until re-render when render exists
+      if (!rendered) await deleteReplacement(token!, id);
       setReplacements((prev) => prev.filter((r) => r.id !== id));
     } catch {
       // deletion failed — leave list unchanged
@@ -357,6 +395,7 @@ export default function ReplaceAIPage() {
 
   const renderReplacements = async () => {
     if (!passageAudio) return;
+    const isFirstRender = !rendered;
     const file = new File([passageAudio.blob], "passage.wav", { type: passageAudio.blob.type });
     setRendering(true);
     try {
@@ -381,8 +420,36 @@ export default function ReplaceAIPage() {
         token!,
         passageId,
         renderedBlob,
-        { renderSource: true, activate: false },
+        { renderSource: passageVersion?.audioKey, activate: false },
       );
+
+      if (isFirstRender) {
+        // Associate the existing unversioned replacements with this version
+        await associateReplacementsWithVersion(token!, passageId, version.id);
+        setSavedReplacements([...replacements]);
+      } else {
+        // Save current replacements as new DB records linked to this version
+        const savedReps = await Promise.all(
+          replacements.map(async (r) => {
+            const { replacement } = await saveReplacement(
+              token!,
+              passageId,
+              r.title,
+              r.note,
+              r.name,
+              r.selection.start,
+              r.selection.end,
+              r.audio,
+              r.original,
+              version.id,
+            );
+            return { ...r, id: replacement.id };
+          }),
+        );
+        setReplacements(savedReps);
+        setSavedReplacements(savedReps);
+      }
+
       setRendered({ version, blob: renderedBlob });
       setShowRendered(true);
     } catch (err) {
@@ -559,18 +626,31 @@ export default function ReplaceAIPage() {
           highlights={showRendered ? [] : highlights}
         />
 
-        {/* Rendered audio toggle */}
+        {/* Rendered audio toggle / Reset */}
         {rendered && (
-          <FormControlLabel
-            control={
-              <Switch
-                checked={showRendered}
-                onChange={(_, checked) => setShowRendered(checked)}
-              />
-            }
-            label="See Rendered Audio"
-            sx={{ ml: "auto", mr: 0 }}
-          />
+          haveReplacementsChanged ? (
+            <Button
+              onClick={() => {
+                setReplacements(savedReplacements);
+                playerRef.current?.setTime(0);
+                playerRef.current?.updateSelection(null);
+              }}
+              sx={{ ml: "auto" }}
+            >
+              Reset
+            </Button>
+          ) : (
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={showRendered}
+                  onChange={(_, checked) => setShowRendered(checked)}
+                />
+              }
+              label="See Rendered Audio"
+              sx={{ ml: "auto", mr: 0 }}
+            />
+          )
         )}
 
         {/* Replacement rows + Add Replacement row in chronological order */}
@@ -673,8 +753,8 @@ export default function ReplaceAIPage() {
         ) : (
           <Button
             fullWidth
-            variant={selection ? undefined : "primary"}
-            disabled={replacements.length === 0 || rendered !== null}
+            variant={replacementRows.some((r) => r.type === "add") ? undefined : "primary"}
+            disabled={replacements.length === 0 || (rendered !== null && !haveReplacementsChanged)}
             onClick={renderReplacements}
           >
             Render Replacements

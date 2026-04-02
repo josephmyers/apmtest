@@ -55,5 +55,6 @@ export const replacements = pgTable('replacements', {
     selectionEnd: doublePrecision('selection_end').notNull(),
     audioKey: varchar('audio_key', { length: 255 }),
     original: boolean('original').notNull().default(true),
+    versionId: integer('version_id').references(() => passageVersions.id, { onDelete: 'set null' }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 });

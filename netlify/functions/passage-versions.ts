@@ -50,16 +50,6 @@ export default async function handler(req: Request, _context: Context) {
       let renderSource = url.searchParams.get("renderSource") || null;
       const activate = url.searchParams.get("activate") !== "0";
 
-      // Auto-populate renderSource from the passage's current audio_key
-      // when "renderSource" param is present but empty (i.e. ?renderSource=)
-      // This lets the frontend signal "this is a render" without knowing the blob key
-      if (url.searchParams.has("renderSource") && !renderSource) {
-        const [passage] = await sql`
-          SELECT audio_key FROM passages WHERE id = ${passageId}
-        `;
-        if (passage?.audio_key) renderSource = passage.audio_key;
-      }
-
       const isRendered = renderSource !== null;
 
       const body = await req.arrayBuffer();
