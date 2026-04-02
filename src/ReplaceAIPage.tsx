@@ -5,6 +5,10 @@ import {
   Box,
   Button,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   FormControlLabel,
   IconButton,
   Menu,
@@ -118,6 +122,7 @@ export default function ReplaceAIPage() {
   const [rendered, setRendered] = useState<{ version: PassageVersion; blob: Blob } | null>(null);
   const [showRendered, setShowRendered] = useState(false);
   const [savedReplacements, setSavedReplacements] = useState<Replacement[]>([]);
+  const [confirmExitOpen, setConfirmExitOpen] = useState(false);
 
   const [composedAudio, setComposedAudio] = useState<Blob | null>(null);
   const [highlights, setHighlights] = useState<
@@ -143,6 +148,15 @@ export default function ReplaceAIPage() {
       );
     });
   }, [replacements, savedReplacements, rendered]);
+
+  useEffect(() => {
+    if (!rendered || !haveReplacementsChanged) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [rendered, haveReplacementsChanged]);
 
   // Load passage audio, rendered audio, and existing replacements on mount
   useEffect(() => {
@@ -262,7 +276,11 @@ export default function ReplaceAIPage() {
   const handleBack = () => navigate("/dashboard");
 
   const handleExit = () => {
-    navigate("/record", { state });
+    if (haveReplacementsChanged) {
+      setConfirmExitOpen(true);
+    } else {
+      navigate("/record", { state });
+    }
   };
 
   const handleDialogContinue = async (data: {
@@ -782,6 +800,31 @@ export default function ReplaceAIPage() {
           previousRecordings={previousRecordings}
         />
       )}
+      <Dialog
+        open={confirmExitOpen}
+        onClose={(_, reason) => reason !== "backdropClick" && setConfirmExitOpen(false)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Leave without saving?</DialogTitle>
+        <DialogContent>
+          <Typography>
+            You have made changes to the replacements on this page. If you leave without rendering, those
+            changes will be lost.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button variant="primary" onClick={() => setConfirmExitOpen(false)}>Cancel</Button>
+          <Button
+            onClick={() => {
+              setConfirmExitOpen(false);
+              navigate("/record", { state });
+            }}
+          >
+            Confirm
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
