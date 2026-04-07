@@ -5,6 +5,10 @@ import {
   Box,
   Button,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
   FormControlLabel,
   IconButton,
   Menu,
@@ -21,14 +25,17 @@ import EditIcon from "@mui/icons-material/Edit";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import { useAuth } from "./AuthContext";
 import {
-  activatePassageVersion,
   associateReplacementsWithVersion,
   createPassageVersion,
-  fetchReplacementAudio,
+  deleteUnversionedReplacements,
+  fetchAudio,
   fetchVersionAudio,
+  fetchUnversionedRendering,
+  getPassage,
   getReplacements,
   listPassageVersions,
   saveReplacement,
+  storePassageStaged,
   updateReplacement,
   deleteReplacement,
   type PassageVersion,
@@ -59,6 +66,7 @@ interface Replacement {
   selection: { start: number; end: number };
   audio: Blob;
   original: boolean;
+  versionId: number | null;
 }
 
 interface OffsetEntry {
@@ -115,9 +123,12 @@ export default function ReplaceAIPage() {
   const [editingReplacement, setEditingReplacement] =
     useState<Replacement | null>(null);
   const [rendering, setRendering] = useState(false);
-  const [rendered, setRendered] = useState<{ version: PassageVersion; blob: Blob } | null>(null);
+  const [renderedBlob, setRenderedBlob] = useState<Blob | null>(null);
   const [showRendered, setShowRendered] = useState(false);
-  const [savedReplacements, setSavedReplacements] = useState<Replacement[]>([]);
+  const [hasUnversionedRendering, setHasUnversionedRendering] = useState(false);
+  // The active replacements are not necessarily what's saved in the DB, though they often are. They are the Reset target.
+  // If you have unversioned replacements and an unversioned rendering, where DB changes happen immediately, if you edit the replacements, how do you Reset?
+  const [activeReplacements, setActiveReplacements] = useState<Replacement[]>([]);
 
   const [composedAudio, setComposedAudio] = useState<Blob | null>(null);
   const [highlights, setHighlights] = useState<
@@ -126,9 +137,9 @@ export default function ReplaceAIPage() {
   const offsetMapRef = useRef<OffsetEntry[]>([]);
 
   const haveReplacementsChanged = useMemo(() => {
-    if (!rendered) return false;
-    if (replacements.length !== savedReplacements.length) return true;
-    const savedById = new Map(savedReplacements.map((r) => [r.id, r]));
+    if (!renderedBlob) return false;
+    if (replacements.length !== activeReplacements.length) return true;
+    const savedById = new Map(activeReplacements.map((r) => [r.id, r]));
     return replacements.some((r) => {
       const s = savedById.get(r.id);
       if (!s) return true;
@@ -142,7 +153,7 @@ export default function ReplaceAIPage() {
         r.audio !== s.audio
       );
     });
-  }, [replacements, savedReplacements, rendered]);
+  }, [replacements, activeReplacements]);
 
   // Load passage audio, rendered audio, and existing replacements on mount
   useEffect(() => {
@@ -154,50 +165,44 @@ export default function ReplaceAIPage() {
     Promise.all([
       getReplacements(token, passageId),
       listPassageVersions(token, passageId),
-    ]).then(async ([{ replacements: repData }, { versions }]) => {
-      // Determine which replacements to display:
-      // unversioned (before any renders) takes priority; otherwise use latest version
-      const unversioned = repData.filter((r) => r.versionId === null);
-      let targets: typeof repData;
-      if (unversioned.length > 0) {
-        targets = unversioned;
-      } else if (versions.length > 0) { // this should always be true
-        // versions is ordered DESC by created_at, so versions[0] is latest
-        const latestId = versions[0].id;
-        targets = repData.filter((r) => r.versionId === latestId);
-      } else {
-        targets = [];
-      }
+    ]).then(async ([replacementsFromDB, { versions }]) => {
+      const { passage } = await getPassage(token, passageId);
+      const activeVersion = versions.find((v) => v.audioKey === passage.audioKey)!;
 
-      const withAudio = await Promise.all(
-        targets.map(async (r) => {
-          const audio = await fetchReplacementAudio(token, r.id);
-          if (!audio) return undefined;
-          return {
-            id: r.id,
-            title: r.title,
-            note: r.note,
-            name: r.name,
-            selection: { start: r.selectionStart, end: r.selectionEnd },
-            audio,
-            original: r.original,
-          };
-        }),
+      const versionedReps = await getReplacements(
+        token,
+        passageId,
+        activeVersion.id,
       );
-      const replacementsFromDB = withAudio.filter((r) => r !== undefined) as Replacement[];
-      setReplacements(replacementsFromDB);
-      setSavedReplacements(replacementsFromDB);
 
-      // Detect rendered version
-      if (passageVersion?.audioKey) {
-        const versionWithPassageAsSource = versions.find(
-          (v) => v.renderSource === passageVersion.audioKey,
+      // If there's an unversioned blob, that's the latest; otherwise, use the active audio
+      const unversionedBlob = await fetchUnversionedRendering(token!, passageId);
+      const renderedBlob = unversionedBlob ?? (activeVersion.renderSource ? await fetchAudio(token!, passageId) : null);
+      setRenderedBlob(renderedBlob);
+      setHasUnversionedRendering(!!unversionedBlob);
+
+      const unversioned = replacementsFromDB.filter((r) => r.versionId === null);
+      if (unversioned.length > 0) {
+        setReplacements(unversioned);
+        setActiveReplacements(unversioned);
+      } else {
+        // No unversioned replacements — make unversioned copies of active replacements
+        // Copy each replacement as unversioned (no versionId)
+        const copies = await Promise.all(
+          versionedReps.map(async (r) => {
+            const { replacement } = await saveReplacement(
+              token, passageId, r.title, r.note, r.name,
+              r.selection.start, r.selection.end, r.audio, r.original,
+            );
+            const { selectionStart, selectionEnd, versionId: _v, ...rest } = replacement;
+            return { ...rest, selection: { start: selectionStart, end: selectionEnd }, audio: r.audio };
+          }),
         );
-        if (versionWithPassageAsSource) {
-          const blob = await fetchVersionAudio(token, versionWithPassageAsSource.id);
-          if (blob) setRendered({ version: versionWithPassageAsSource, blob });
-        }
+
+        setReplacements(copies.filter(Boolean) as Replacement[]);
+        setActiveReplacements(versionedReps);
       }
+
     });
   }, [token, passageId]);
 
@@ -261,7 +266,20 @@ export default function ReplaceAIPage() {
 
   const handleBack = () => navigate("/dashboard");
 
+  // If they have rendered but unversioned audio, but the replacements have changed since that rendering, it would be very strange to
+  // exit and return to a rendered audio that doesn't match the set of replacements, especially if the rendering is unversioned.
+  // If you have unversioned replacements and an unversioned rendering, where DB changes happen immediately, if you edit the replacements, how do you Reset?
   const handleExit = () => {
+    if (renderedBlob && haveReplacementsChanged) {
+      setConfirmExitOpen(true);
+    } else {
+      navigate("/record", { state });
+    }
+  };
+
+  const confirmExit = async () => {
+    setConfirmExitOpen(false);
+    await handleReset();
     navigate("/record", { state });
   };
 
@@ -274,100 +292,95 @@ export default function ReplaceAIPage() {
     audio: Blob;
     original: boolean;
   }) => {
-    const editing = !!editingReplacement;
-    const newSelection = {
-      start: composedToOriginalTime(data.selection.start, offsetMapRef.current),
-      end: composedToOriginalTime(data.selection.end, offsetMapRef.current),
-    };
-    const audioChanged = !editing || data.audio !== editingReplacement!.audio;
-    const audioToStore = audioChanged
-      ? await compressToMp3(
-          new File([data.audio], "replacement.webm", { type: data.audio.type }),
-          64,
-        )
-      : editingReplacement!.audio;
+    setSaving(true);
+    try {
+      const isEdit = !!editingReplacement;
+      const newSelection = {
+        start: composedToOriginalTime(data.selection.start, offsetMapRef.current),
+        end: composedToOriginalTime(data.selection.end, offsetMapRef.current),
+      };
 
-    let newId = -(Date.now()); // temp ID for deferred adds; overwritten by DB response below
-    if (!rendered) { // update DB immediately
-      setSaving(true);
-      try {
-        if (editing) {
-          await updateReplacement(
-            token!,
-            editingReplacement!.id,
-            data.title,
-            data.note,
-            data.name,
-            newSelection.start,
-            newSelection.end,
-            audioChanged ? audioToStore : undefined,
-            data.original,
-          );
-        } else {
-          const { replacement } = await saveReplacement(
-            token!,
-            passageId,
-            data.title,
-            data.note,
-            data.name,
-            newSelection.start,
-            newSelection.end,
-            audioToStore,
-            data.original,
-          );
-          newId = replacement.id;
-        }
-      } catch {
-        setSaving(false);
-        return; // save/update failed — dialog stays open
+      const audioChanged = !isEdit || data.audio !== editingReplacement.audio;
+      const mp3Blob = audioChanged
+        ? await compressToMp3(
+            new File([data.audio], "replacement.webm", {
+              type: data.audio.type,
+            }),
+            64,
+          )
+        : undefined;
+
+      if (isEdit) {
+        const { replacement } = await updateReplacement(
+          token!,
+          editingReplacement.id,
+          data.title,
+          data.note,
+          data.name,
+          newSelection.start,
+          newSelection.end,
+          mp3Blob,
+          data.original,
+        );
+        setReplacements((prev) =>
+          prev.map((r) =>
+            r.id === replacement.id
+              ? {
+                  ...r,
+                  title: data.title,
+                  note: data.note,
+                  name: data.name,
+                  audio: mp3Blob ?? r.audio,
+                  selection: newSelection,
+                  original: data.original,
+                }
+              : r,
+          ),
+        );
+      } else {
+        const { replacement } = await saveReplacement(
+          token!,
+          passageId,
+          data.title,
+          data.note,
+          data.name,
+          newSelection.start,
+          newSelection.end,
+          mp3Blob!,
+          data.original,
+        );
+        setReplacements((prev) => [
+          ...prev,
+          {
+            id: replacement.id,
+            title: data.title,
+            note: data.note,
+            name: data.name,
+            selection: newSelection,
+            audio: mp3Blob!,
+            original: data.original,
+            versionId: null,
+          },
+        ]);
       }
+
+      playerRef.current?.updateSelection({
+        start: data.selection.start,
+        end: data.selection.start + data.replacementDuration,
+      });
+      setAddDialogOpen(false);
+      setEditingReplacement(null);
+    } catch {
+      // save/update failed — dialog stays open
+    } finally {
       setSaving(false);
     }
-
-    // update the UI
-    if (editing) {
-      setReplacements((prev) =>
-        prev.map((r) =>
-          r.id === editingReplacement!.id
-            ? {
-                ...r,
-                title: data.title,
-                note: data.note,
-                name: data.name,
-                selection: newSelection,
-                audio: audioToStore,
-                original: data.original,
-              }
-            : r,
-        ),
-      );
-    } else {
-      setReplacements((prev) => [
-        ...prev,
-        {
-          id: newId,
-          title: data.title,
-          note: data.note,
-          name: data.name,
-          selection: newSelection,
-          audio: audioToStore,
-          original: data.original,
-        },
-      ]);
-    }
-    playerRef.current?.updateSelection({
-      start: data.selection.start,
-      end: data.selection.start + data.replacementDuration,
-    });
-    setAddDialogOpen(false);
-    setEditingReplacement(null);
   };
 
   const handleDeleteReplacement = async (id: number) => {
     setSaving(true);
     try {
-      // defer delete until re-render when render exists
-      if (!rendered) await deleteReplacement(token!, id);
+      await deleteReplacement(token!, id);
       setReplacements((prev) => prev.filter((r) => r.id !== id));
     } catch {
       // deletion failed — leave list unchanged
@@ -393,9 +406,20 @@ export default function ReplaceAIPage() {
     );
   };
 
+  const [confirmRenderOpen, setConfirmRenderOpen] = useState(false);
+  const [confirmExitOpen, setConfirmExitOpen] = useState(false); // I'm pretty sure we still need this
+
+  const handleRenderClick = () => {
+    if (hasUnversionedRendering) {
+      setConfirmRenderOpen(true);
+    } else {
+      renderReplacements();
+    }
+  };
+
   const renderReplacements = async () => {
+    setConfirmRenderOpen(false);
     if (!passageAudio) return;
-    const isFirstRender = !rendered;
     const file = new File([passageAudio.blob], "passage.wav", { type: passageAudio.blob.type });
     setRendering(true);
     try {
@@ -416,41 +440,10 @@ export default function ReplaceAIPage() {
       const renderedBlob = await pollTask(
         `https://api-dev.audioprojectmanager.org/api/aero/infilling/${taskId}`,
       );
-      const { version } = await createPassageVersion(
-        token!,
-        passageId,
-        renderedBlob,
-        { renderSource: passageVersion?.audioKey, activate: false },
-      );
-
-      if (isFirstRender) {
-        // Associate the existing unversioned replacements with this version
-        await associateReplacementsWithVersion(token!, passageId, version.id);
-        setSavedReplacements([...replacements]);
-      } else {
-        // Save current replacements as new DB records linked to this version
-        const savedReps = await Promise.all(
-          replacements.map(async (r) => {
-            const { replacement } = await saveReplacement(
-              token!,
-              passageId,
-              r.title,
-              r.note,
-              r.name,
-              r.selection.start,
-              r.selection.end,
-              r.audio,
-              r.original,
-              version.id,
-            );
-            return { ...r, id: replacement.id };
-          }),
-        );
-        setReplacements(savedReps);
-        setSavedReplacements(savedReps);
-      }
-
-      setRendered({ version, blob: renderedBlob });
+      await storePassageStaged(token!, passageId, renderedBlob);
+      setActiveReplacements([...replacements]);
+      setRenderedBlob(renderedBlob);
+      setHasUnversionedRendering(true);
       setShowRendered(true);
     } catch (err) {
       console.error("renderReplacements error:", err);
@@ -460,13 +453,17 @@ export default function ReplaceAIPage() {
   };
 
   const handleUseThisVersion = async () => {
-    if (!rendered) return;
-    await activatePassageVersion(token!, rendered.version.id);
+    if (!renderedBlob) return;
+    const { version } = await createPassageVersion(
+      token!, passageId, renderedBlob,
+      { renderSource: passageVersion?.audioKey, activate: true },
+    );
+    await associateReplacementsWithVersion(token!, passageId, version.id);
     navigate("/record", { state });
   };
 
   const handleDownloadAudio = () => {
-    const blob = showRendered ? rendered?.blob : (composedAudio ?? passageAudio?.blob);
+    const blob = showRendered ? renderedBlob : (composedAudio ?? passageAudio?.blob);
     if (!blob) return;
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -484,6 +481,30 @@ export default function ReplaceAIPage() {
     });
     setEditingReplacement(r);
     setAddDialogOpen(true);
+  };
+
+  const handleReset = async () => {
+    await deleteUnversionedReplacements(token!, passageId);
+    const resaved = await Promise.all(
+      activeReplacements.map(async (r) => {
+        const { replacement } = await saveReplacement(
+          token!, passageId, r.title, r.note, r.name,
+          r.selection.start, r.selection.end, r.audio, r.original,
+        );
+        return { ...r, id: replacement.id };
+      }),
+    );
+    setReplacements(resaved);
+    setActiveReplacements(resaved);
+
+    // if there's an unversioned blob, that's the latest; otherwise, the currently used audio is the reset target
+    const unversionedBlob = await fetchUnversionedRendering(token!, passageId);
+    const renderedBlob = unversionedBlob ?? await fetchAudio(token!, passageId);
+    setRenderedBlob(renderedBlob);
+    setHasUnversionedRendering(!!unversionedBlob);
+
+    playerRef.current?.setTime(0);
+    playerRef.current?.updateSelection(null);
   };
 
   const previousRecordings = useMemo(
@@ -616,7 +637,7 @@ export default function ReplaceAIPage() {
           ref={playerRef}
           audioSource={
             showRendered
-              ? rendered!.blob
+              ? renderedBlob!
               : (composedAudio ?? passageAudio?.blob ?? undefined)
           }
           height={80}
@@ -627,14 +648,10 @@ export default function ReplaceAIPage() {
         />
 
         {/* Rendered audio toggle / Reset */}
-        {rendered && (
+        {renderedBlob && (
           haveReplacementsChanged ? (
             <Button
-              onClick={() => {
-                setReplacements(savedReplacements);
-                playerRef.current?.setTime(0);
-                playerRef.current?.updateSelection(null);
-              }}
+              onClick={handleReset}
               sx={{ ml: "auto" }}
             >
               Reset
@@ -754,13 +771,40 @@ export default function ReplaceAIPage() {
           <Button
             fullWidth
             variant={replacementRows.some((r) => r.type === "add") ? undefined : "primary"}
-            disabled={replacements.length === 0 || (rendered !== null && !haveReplacementsChanged)}
-            onClick={renderReplacements}
+            disabled={replacements.length === 0 || (renderedBlob !== null && !haveReplacementsChanged)}
+            onClick={handleRenderClick}
           >
             Render Replacements
           </Button>
         )}
       </Box>
+
+      {/* ─── Confirm Re-render Dialog ─────────────────────── */}
+      <Dialog open={confirmRenderOpen} onClose={() => setConfirmRenderOpen(false)}>
+        <DialogContent>
+          <DialogContentText>
+            Rendering will overwrite your existing rendered audio.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmRenderOpen(false)} variant="primary">Cancel</Button>
+          <Button onClick={renderReplacements}>Confirm</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ─── Confirm Exit Dialog ──────────────────────────── */}
+      <Dialog open={confirmExitOpen} onClose={() => setConfirmExitOpen(false)}>
+        <DialogContent>
+          <DialogContentText>
+            You have made changes to the replacements on this page. If you leave without rendering, those
+            changes will be lost.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmExitOpen(false)} variant="primary">Cancel</Button>
+          <Button onClick={confirmExit}>Confirm</Button>
+        </DialogActions>
+      </Dialog>
 
       {/* ─── Add / Edit Replacement Dialog ────────────────── */}
       {selection && (

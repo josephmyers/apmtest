@@ -89,11 +89,11 @@ export default async function handler(req: Request, _context: Context) {
         const speaker = url.searchParams.get("speaker");
         if (speaker) {
           await sql`
-            UPDATE passages SET audio_key = ${blobKey}, speaker = ${speaker} WHERE id = ${passageId}
+            UPDATE passages SET audio_key = ${blobKey}, speaker = ${speaker}, unversioned_rendering = NULL WHERE id = ${passageId}
           `;
         } else {
           await sql`
-            UPDATE passages SET audio_key = ${blobKey} WHERE id = ${passageId}
+            UPDATE passages SET audio_key = ${blobKey}, unversioned_rendering = NULL WHERE id = ${passageId}
           `;
         }
       }
@@ -121,7 +121,7 @@ export default async function handler(req: Request, _context: Context) {
       if (!version) return jsonRes({ error: "Version not found" }, 404);
 
       await sql`
-        UPDATE passages SET audio_key = ${version.audio_key} WHERE id = ${version.passage_id}
+        UPDATE passages SET audio_key = ${version.audio_key}, unversioned_rendering = NULL WHERE id = ${version.passage_id}
       `;
 
       return jsonRes({ success: true });

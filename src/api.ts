@@ -16,6 +16,7 @@ export interface Passage {
   description: string;
   sortOrder: number;
   audioKey: string | null;
+  unversionedRendering: string | null;
   speaker: string | null;
   createdAt: string;
 }
@@ -42,7 +43,10 @@ interface ProjectDetailResponse {
   project: Project;
 }
 
-export async function signup(email: string, password: string): Promise<AuthResponse> {
+export async function signup(
+  email: string,
+  password: string,
+): Promise<AuthResponse> {
   const res = await fetch(`${API_BASE}/signup`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -53,7 +57,10 @@ export async function signup(email: string, password: string): Promise<AuthRespo
   return data;
 }
 
-export async function login(email: string, password: string): Promise<AuthResponse> {
+export async function login(
+  email: string,
+  password: string,
+): Promise<AuthResponse> {
   const res = await fetch(`${API_BASE}/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -82,7 +89,10 @@ export async function getProjects(token: string): Promise<ProjectListResponse> {
   return data;
 }
 
-export async function getProject(token: string, id: number): Promise<ProjectDetailResponse> {
+export async function getProject(
+  token: string,
+  id: number,
+): Promise<ProjectDetailResponse> {
   const res = await fetch(`${API_BASE}/projects?id=${id}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -94,7 +104,7 @@ export async function getProject(token: string, id: number): Promise<ProjectDeta
 export async function createSection(
   token: string,
   projectId: number,
-  name: string
+  name: string,
 ): Promise<{ section: Section }> {
   const res = await fetch(`${API_BASE}/projects`, {
     method: "POST",
@@ -111,7 +121,7 @@ export async function createSection(
 
 export async function deleteSection(
   token: string,
-  sectionId: number
+  sectionId: number,
 ): Promise<{ success: boolean }> {
   const res = await fetch(`${API_BASE}/projects?sectionId=${sectionId}`, {
     method: "DELETE",
@@ -126,7 +136,7 @@ export async function createPassage(
   token: string,
   sectionId: number,
   reference: string,
-  sortOrder: number
+  sortOrder: number,
 ): Promise<{ passage: Passage }> {
   const res = await fetch(`${API_BASE}/projects`, {
     method: "POST",
@@ -144,7 +154,7 @@ export async function createPassage(
 export async function renameSection(
   token: string,
   sectionId: number,
-  name: string
+  name: string,
 ): Promise<{ section: Section }> {
   const res = await fetch(`${API_BASE}/projects`, {
     method: "PATCH",
@@ -162,7 +172,7 @@ export async function renameSection(
 export async function renamePassage(
   token: string,
   passageId: number,
-  reference: string
+  reference: string,
 ): Promise<{ passage: Passage }> {
   const res = await fetch(`${API_BASE}/projects`, {
     method: "PATCH",
@@ -179,12 +189,15 @@ export async function renamePassage(
 
 export async function fetchAudio(
   token: string,
-  passageId: number
+  passageId: number,
 ): Promise<Blob | null> {
-  const res = await fetch(`${API_BASE}/passage-versions?passageId=${passageId}&audio=1`, {
-    headers: { Authorization: `Bearer ${token}` },
-    cache: "no-store",
-  });
+  const res = await fetch(
+    `${API_BASE}/passage-versions?passageId=${passageId}&audio=1`,
+    {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    },
+  );
   if (res.status === 404) return null;
   if (!res.ok) return null;
   return await res.blob();
@@ -195,7 +208,7 @@ export interface Speaker {
 }
 
 export async function getSpeakers(
-  token: string
+  token: string,
 ): Promise<{ speakers: Speaker[] }> {
   const res = await fetch(`${API_BASE}/speakers`, {
     headers: { Authorization: `Bearer ${token}` },
@@ -208,7 +221,7 @@ export async function getSpeakers(
 export async function getPassage(
   token: string,
   passageId: number,
-): Promise<{ passage: Passage}> {
+): Promise<{ passage: Passage }> {
   const res = await fetch(`${API_BASE}/passage?passageId=${passageId}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -224,6 +237,18 @@ export interface ReplacementData {
   name: string;
   selectionStart: number;
   selectionEnd: number;
+  original: boolean;
+  versionId: number | null;
+}
+
+//todo duplication
+interface Replacement {
+  id: number;
+  title: string;
+  note: string;
+  name: string;
+  selection: { start: number; end: number };
+  audio: Blob;
   original: boolean;
   versionId: number | null;
 }
@@ -270,20 +295,34 @@ export async function associateReplacementsWithVersion(
     { method: "PATCH", headers: { Authorization: `Bearer ${token}` } },
   );
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || "Failed to associate replacements");
+  if (!res.ok)
+    throw new Error(data.error || "Failed to associate replacements");
   return data;
 }
 
 export async function getReplacements(
   token: string,
   passageId: number,
-): Promise<{ replacements: ReplacementData[] }> {
-  const res = await fetch(`${API_BASE}/replacements?passageId=${passageId}`, {
+  versionId?: number,
+): Promise<Replacement[]> {
+  const params = new URLSearchParams({ passageId: String(passageId) });
+  if (versionId !== undefined) params.set("versionId", String(versionId));
+  const res = await fetch(`${API_BASE}/replacements?${params}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || "Failed to fetch replacements");
-  return data;
+  const data = (await res.json()) as { replacements: ReplacementData[] };
+  if (!res.ok) throw new Error("Failed to fetch replacements");
+  return Promise.all(
+    data.replacements.map(async (rd) => {
+      const audio = await fetchReplacementAudio(token, rd.id);
+      return {
+        ...rd,
+        selection: { start: rd.selectionStart, end: rd.selectionEnd },
+        audio: audio!,
+        versionId: rd.versionId,
+      };
+    }),
+  );
 }
 
 export async function fetchReplacementAudio(
@@ -312,6 +351,20 @@ export async function deleteReplacement(
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "Failed to delete replacement");
+  return data;
+}
+
+export async function deleteUnversionedReplacements(
+  token: string,
+  passageId: number,
+): Promise<{ success: boolean }> {
+  const res = await fetch(`${API_BASE}/replacements?passageId=${passageId}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok)
+    throw new Error(data.error || "Failed to delete unversioned replacements");
   return data;
 }
 
@@ -378,20 +431,8 @@ export async function createPassageVersion(
     body: blob,
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || "Failed to create passage version");
-  return data;
-}
-
-export async function activatePassageVersion(
-  token: string,
-  versionId: number,
-): Promise<{ success: boolean }> {
-  const res = await fetch(`${API_BASE}/passage-versions?id=${versionId}`, {
-    method: "PATCH",
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || "Failed to activate version");
+  if (!res.ok)
+    throw new Error(data.error || "Failed to create passage version");
   return data;
 }
 
@@ -410,21 +451,53 @@ export async function fetchVersionAudio(
   return await res.blob();
 }
 
+export async function storePassageStaged(
+  token: string,
+  passageId: number,
+  blob: Blob,
+): Promise<{ success: boolean }> {
+  const res = await fetch(`${API_BASE}/passage?passageId=${passageId}`, {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${token}` },
+    body: blob,
+  });
+  const data = await res.json();
+  if (!res.ok)
+    throw new Error(data.error || "Failed to store staged rendering");
+  return data;
+}
+
+export async function fetchUnversionedRendering(
+  token: string,
+  passageId: number,
+): Promise<Blob | null> {
+  const res = await fetch(
+    `${API_BASE}/passage?passageId=${passageId}&unversionedAudio=1`,
+    { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" },
+  );
+  if (res.status === 404 || !res.ok) return null;
+  return await res.blob();
+}
+
 export async function listPassageVersions(
   token: string,
   passageId: number,
 ): Promise<{ versions: PassageVersion[] }> {
-  const res = await fetch(`${API_BASE}/passage-versions?passageId=${passageId}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  const res = await fetch(
+    `${API_BASE}/passage-versions?passageId=${passageId}`,
+    {
+      headers: { Authorization: `Bearer ${token}` },
+    },
+  );
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || "Failed to fetch passage versions");
+  if (!res.ok)
+    throw new Error(data.error || "Failed to fetch passage versions");
   return data;
 }
 
 export async function createSpeaker(
   token: string,
-  name: string
+  name: string,
 ): Promise<{ speaker: Speaker }> {
   const res = await fetch(`${API_BASE}/speakers`, {
     method: "POST",

@@ -58,6 +58,50 @@ export default async function handler(req: Request, _context: Context) {
       if (!passageId) return jsonRes({ error: "passageId is required" }, 400);
       if (!title) return jsonRes({ error: "title is required" }, 400);
 
+      // Return existing record if an identical replacement already exists (duplication guard)
+      const existingEntry = versionId !== null
+        ? await sql`
+            SELECT id, title, note, name, selection_start, selection_end, original, version_id
+            FROM replacements
+            WHERE passage_id = ${passageId}
+              AND version_id = ${versionId}
+              AND title = ${title}
+              AND note = ${note}
+              AND name = ${name}
+              AND selection_start = ${selectionStart}
+              AND selection_end = ${selectionEnd}
+              AND original = ${original}
+            LIMIT 1
+          `
+        : await sql`
+            SELECT id, title, note, name, selection_start, selection_end, original, version_id
+            FROM replacements
+            WHERE passage_id = ${passageId}
+              AND version_id IS NULL
+              AND title = ${title}
+              AND note = ${note}
+              AND name = ${name}
+              AND selection_start = ${selectionStart}
+              AND selection_end = ${selectionEnd}
+              AND original = ${original}
+            LIMIT 1
+          `;
+      if (existingEntry.length > 0) {
+        const r = existingEntry[0];
+        return jsonRes({
+          replacement: {
+            id: r.id,
+            title: r.title,
+            note: r.note,
+            name: r.name,
+            selectionStart: r.selection_start,
+            selectionEnd: r.selection_end,
+            original: r.original,
+            versionId: r.version_id ?? null,
+          },
+        });
+      }
+
       // Insert row first to get the id
       const rows = await sql`
         INSERT INTO replacements (passage_id, title, note, name, selection_start, selection_end, original, version_id)
@@ -117,17 +161,25 @@ export default async function handler(req: Request, _context: Context) {
       });
     }
 
-    // GET /replacements?passageId=1
+    // GET /replacements?passageId=1[&versionId=5]
     if (method === "GET") {
       const passageId = Number(url.searchParams.get("passageId"));
       if (!passageId) return jsonRes({ error: "passageId is required" }, 400);
 
-      const rows = await sql`
-        SELECT id, title, note, name, selection_start, selection_end, original, version_id
-        FROM replacements
-        WHERE passage_id = ${passageId}
-        ORDER BY created_at
-      `;
+      const versionIdParam = url.searchParams.get("versionId");
+      const rows = versionIdParam !== null
+        ? await sql`
+            SELECT id, title, note, name, selection_start, selection_end, original, version_id
+            FROM replacements
+            WHERE passage_id = ${passageId} AND version_id = ${Number(versionIdParam)}
+            ORDER BY created_at
+          `
+        : await sql`
+            SELECT id, title, note, name, selection_start, selection_end, original, version_id
+            FROM replacements
+            WHERE passage_id = ${passageId}
+            ORDER BY created_at
+          `;
 
       return jsonRes({
         replacements: rows.map((r: Record<string, unknown>) => ({
@@ -182,22 +234,43 @@ export default async function handler(req: Request, _context: Context) {
       });
     }
 
-    // DELETE /replacements?id=1
+    // DELETE /replacements?id=1 — delete a single replacement
+    // DELETE /replacements?passageId=1 — delete all unversioned replacements for a passage
     if (method === "DELETE") {
       const id = Number(url.searchParams.get("id"));
-      if (!id) return jsonRes({ error: "id is required" }, 400);
+      const passageId = Number(url.searchParams.get("passageId"));
 
-      // Delete audio blob if it exists
-      const rows = await sql`
-        SELECT audio_key FROM replacements WHERE id = ${id}
-      `;
-      if (rows.length > 0 && rows[0].audio_key) {
-        await store.delete(rows[0].audio_key);
+      if (id) {
+        const rows = await sql`SELECT audio_key, original, title, note FROM replacements WHERE id = ${id}`;
+        if (rows.length > 0) {
+          if (rows[0].audio_key) {
+            await store.delete(rows[0].audio_key);
+          }
+          if (rows[0].original) {
+            // If deleting the original, check for copies and make a copy the new original
+            const copies = await sql`SELECT id FROM replacements WHERE title = ${rows[0].title} AND note = ${rows[0].note} AND id != ${id} LIMIT 1`;
+            if (copies.length > 0) {
+              await sql`UPDATE replacements SET original = true WHERE id = ${copies[0].id}`;
+            }
+          }
+        }
+        await sql`DELETE FROM replacements WHERE id = ${id}`;
+        return jsonRes({ success: true });
       }
 
-      await sql`DELETE FROM replacements WHERE id = ${id}`;
+      if (passageId) {
+        const rows = await sql`
+          SELECT audio_key FROM replacements
+          WHERE passage_id = ${passageId} AND version_id IS NULL
+        `;
+        for (const r of rows) {
+          if (r.audio_key) await store.delete(r.audio_key);
+        }
+        await sql`DELETE FROM replacements WHERE passage_id = ${passageId} AND version_id IS NULL`;
+        return jsonRes({ success: true });
+      }
 
-      return jsonRes({ success: true });
+      return jsonRes({ error: "id or passageId is required" }, 400);
     }
 
     // PATCH /replacements?passageId=1&versionId=5

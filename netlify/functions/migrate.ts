@@ -101,6 +101,11 @@ export default async function handler(_req: Request, _context: Context) {
     ADD COLUMN IF NOT EXISTS version_id INTEGER REFERENCES passage_versions(id) ON DELETE SET NULL
   `;
 
+  await sql`
+    ALTER TABLE passages
+    ADD COLUMN IF NOT EXISTS unversioned_rendering VARCHAR(255)
+  `;
+
   // Seed a default project if none exists
   const existing = await sql`SELECT id FROM projects LIMIT 1`;
   if (existing.length === 0) {
