@@ -136,24 +136,21 @@ export default function ReplaceAIPage() {
   >([]);
   const offsetMapRef = useRef<OffsetEntry[]>([]);
 
-  const haveReplacementsChanged = useMemo(() => {
-    if (!renderedBlob) return false;
-    if (replacements.length !== activeReplacements.length) return true;
-    const savedById = new Map(activeReplacements.map((r) => [r.id, r]));
-    return replacements.some((r) => {
-      const s = savedById.get(r.id);
-      if (!s) return true;
-      return (
-        r.title !== s.title ||
-        r.note !== s.note ||
-        r.name !== s.name ||
-        r.selection.start !== s.selection.start ||
-        r.selection.end !== s.selection.end ||
-        r.original !== s.original ||
-        r.audio !== s.audio
-      );
-    });
-  }, [replacements, activeReplacements]);
+const haveReplacementsChanged = useMemo(() => {
+  if (!renderedBlob) return false;
+  if (replacements.length !== activeReplacements.length) return true;
+  return replacements.some(r =>
+    !activeReplacements.find(s =>
+      r.title === s.title &&
+      r.note === s.note &&
+      r.name === s.name &&
+      r.selection.start === s.selection.start &&
+      r.selection.end === s.selection.end &&
+      r.original === s.original &&
+      r.audio === s.audio
+    )
+  );
+}, [replacements, activeReplacements]);
 
   // Load passage audio, rendered audio, and existing replacements on mount
   useEffect(() => {
