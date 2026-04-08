@@ -6,6 +6,8 @@ import {
   Checkbox,
   CircularProgress,
   IconButton,
+  ListItemIcon,
+  ListItemText,
   Menu,
   MenuItem,
   Snackbar,
@@ -14,6 +16,7 @@ import {
 import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
 import FolderOpenIcon from "@mui/icons-material/FolderOpen";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
+import GraphicEqIcon from "@mui/icons-material/GraphicEq";
 
 import StopIcon from "@mui/icons-material/Stop";
 import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
@@ -26,6 +29,7 @@ import {
   getPassage,
   listPassageVersions,
   fetchVersionAudio,
+  fetchUnversionedRendering,
   getSpeakers,
   type Speaker,
   type PassageVersion,
@@ -102,6 +106,8 @@ function RecordPageInner() {
   const [uploading, setUploading] = useState(false);
   const [snackMsg, setSnackMsg] = useState<string | null>(null);
 
+  const [hasUnversionedRendering, setHasUnversionedRendering] = useState(false);
+
   // Passage dropdown state
   const [passageMenuAnchor, setPassageMenuAnchor] =
     useState<null | HTMLElement>(null);
@@ -145,6 +151,9 @@ function RecordPageInner() {
           if (rsBlob) setRenderSource({ blob: rsBlob, version: renderSourceVersion });
         });
       }
+    });
+    fetchUnversionedRendering(token, passageId).then((blob) => {
+      setHasUnversionedRendering(!!blob);
     });
   }, [token, passageId]);
 
@@ -434,17 +443,28 @@ function RecordPageInner() {
             height={80}
             enableDragSelection
             onRecordingComplete={handleRecordingComplete}
-            onReplaceAI={() =>
-              navigate("/replace-ai", {
-                state: {
-                  passageId,
-                  passageReference,
-                  projectName,
-                  speaker: selectedSpeaker,
-                  sectionPassages,
-                  passageVersion: renderSource?.version ?? passageAudio?.version ?? null,
-                },
-              })
+            menuItems={
+              <MenuItem
+                onClick={() =>
+                  navigate("/replace-ai", {
+                    state: {
+                      passageId,
+                      passageReference,
+                      projectName,
+                      speaker: selectedSpeaker,
+                      sectionPassages,
+                      passageVersion: renderSource?.version ?? passageAudio?.version ?? null,
+                    },
+                  })
+                }
+              >
+                <ListItemIcon>
+                  <GraphicEqIcon />
+                </ListItemIcon>
+                <ListItemText>
+                  {hasUnversionedRendering ? "Resume Replace (AI)" : "Replace (AI)"}
+                </ListItemText>
+              </MenuItem>
             }
             topRowLabel={
               passageAudio?.version.renderSource ? (

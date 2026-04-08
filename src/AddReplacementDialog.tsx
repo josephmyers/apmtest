@@ -214,7 +214,6 @@ export default function AddReplacementDialog({
           ref={passagePlayerRef}
           audioSource={previewAudio}
           height={60}
-          showReplaceAI={false}
           stickySelection={stickySelection}
           highlights={[
             ...adjustedHighlights,
@@ -373,7 +372,6 @@ export default function AddReplacementDialog({
               : undefined) ?? editData?.audio
           }
           height={60}
-          showReplaceAI={false}
           enableDragSelection
           showRecordButton
           showCut

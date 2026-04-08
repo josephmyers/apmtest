@@ -13,17 +13,13 @@ import {
   Box,
   CircularProgress,
   IconButton,
-  ListItemIcon,
-  ListItemText,
   Menu,
-  MenuItem,
   Stack,
   Typography,
 } from "@mui/material";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import PauseIcon from "@mui/icons-material/Pause";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
-import GraphicEqIcon from "@mui/icons-material/GraphicEq";
 import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
 import StopIcon from "@mui/icons-material/Stop";
 import ContentCutIcon from "@mui/icons-material/ContentCut";
@@ -87,10 +83,8 @@ export interface AudioPlayerProps {
   /** Called when a recording completes (provides the recorded Blob) */
   onRecordingComplete?: (blob: Blob) => void;
 
-  /** Show the "Replace (AI)" menu item (default: true) */
-  showReplaceAI?: boolean;
-  /** Called when the user clicks "Replace AI" in the menu */
-  onReplaceAI?: () => void;
+  /** Menu items to show in the overflow menu (e.g. <MenuItem> elements) */
+  menuItems?: React.ReactNode;
 
   /** Called when the drag-selection changes (null when cleared) */
   onSelectionChange?: (
@@ -142,8 +136,7 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
       formatTimeDisplay,
       onTimeUpdate,
       onReady,
-      showReplaceAI = true,
-      onReplaceAI,
+      menuItems: menuItemsProp,
       onSelectionChange,
       showRecordButton = false,
       showCut = false,
@@ -670,24 +663,8 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
     const handleMenuClose = () => {
       setMenuAnchorEl(null);
     };
-    const handleReplaceAi = () => {
-      handleMenuClose();
-      onReplaceAI?.();
-    };
     const isMenuOpen = Boolean(menuAnchorEl);
-
-    const menuItems: React.ReactNode[] = [];
-    if (showReplaceAI) {
-      menuItems.push(
-        <MenuItem key="replace-ai" onClick={handleReplaceAi}>
-          <ListItemIcon>
-            <GraphicEqIcon />
-          </ListItemIcon>
-          <ListItemText>Replace (AI)</ListItemText>
-        </MenuItem>,
-      );
-    }
-    const hasMenu = menuItems.length > 0;
+    const hasMenu = React.Children.count(menuItemsProp) > 0;
 
     const timeText = formatTimeDisplay
       ? formatTimeDisplay(currentTime, duration)
@@ -789,7 +766,7 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
             open={isMenuOpen}
             onClose={handleMenuClose}
           >
-            {menuItems}
+            {menuItemsProp}
           </Menu>
         )}
 

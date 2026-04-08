@@ -647,7 +647,6 @@ const haveReplacementsChanged = useMemo(() => {
           }
           height={80}
           enableDragSelection
-          showReplaceAI={false}
           onSelectionChange={showRendered ? undefined : setSelection}
           highlights={showRendered ? [] : highlights}
         />
