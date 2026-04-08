@@ -303,10 +303,12 @@ export async function associateReplacementsWithVersion(
 export async function getReplacements(
   token: string,
   passageId: number,
-  versionId?: number,
+  versionId?: number | null,
 ): Promise<Replacement[]> {
   const params = new URLSearchParams({ passageId: String(passageId) });
-  if (versionId !== undefined) params.set("versionId", String(versionId));
+  if (versionId !== undefined) {
+    params.set("versionId", versionId === null ? "null" : String(versionId));
+  }
   const res = await fetch(`${API_BASE}/replacements?${params}`, {
     headers: { Authorization: `Bearer ${token}` },
   });

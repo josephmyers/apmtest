@@ -161,25 +161,41 @@ export default async function handler(req: Request, _context: Context) {
       });
     }
 
-    // GET /replacements?passageId=1[&versionId=5]
+    // GET /replacements?passageId=1[&versionId=5|null]
+    // versionId=null filters to unversioned (NULL) replacements only
+    // No versionId param returns all replacements for the passage
     if (method === "GET") {
       const passageId = Number(url.searchParams.get("passageId"));
       if (!passageId) return jsonRes({ error: "passageId is required" }, 400);
 
       const versionIdParam = url.searchParams.get("versionId");
-      const rows = versionIdParam !== null
-        ? await sql`
-            SELECT id, title, note, name, selection_start, selection_end, original, version_id
-            FROM replacements
-            WHERE passage_id = ${passageId} AND version_id = ${Number(versionIdParam)}
-            ORDER BY created_at
-          `
-        : await sql`
-            SELECT id, title, note, name, selection_start, selection_end, original, version_id
-            FROM replacements
-            WHERE passage_id = ${passageId}
-            ORDER BY created_at
-          `;
+      let rows;
+      
+      if (versionIdParam === "null") {
+        // Explicitly filter for unversioned replacements
+        rows = await sql`
+          SELECT id, title, note, name, selection_start, selection_end, original, version_id
+          FROM replacements
+          WHERE passage_id = ${passageId} AND version_id IS NULL
+          ORDER BY created_at
+        `;
+      } else if (versionIdParam !== null) {
+        // Filter for a specific version
+        rows = await sql`
+          SELECT id, title, note, name, selection_start, selection_end, original, version_id
+          FROM replacements
+          WHERE passage_id = ${passageId} AND version_id = ${Number(versionIdParam)}
+          ORDER BY created_at
+        `;
+      } else {
+        // No version filter: return all replacements
+        rows = await sql`
+          SELECT id, title, note, name, selection_start, selection_end, original, version_id
+          FROM replacements
+          WHERE passage_id = ${passageId}
+          ORDER BY created_at
+        `;
+      }
 
       return jsonRes({
         replacements: rows.map((r: Record<string, unknown>) => ({

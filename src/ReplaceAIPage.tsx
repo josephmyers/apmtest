@@ -163,9 +163,9 @@ export default function ReplaceAIPage() {
     });
 
     Promise.all([
-      getReplacements(token, passageId),
+      getReplacements(token, passageId, null),
       listPassageVersions(token, passageId),
-    ]).then(async ([replacementsFromDB, { versions }]) => {
+    ]).then(async ([unversionedReplacements, { versions }]) => {
       const { passage } = await getPassage(token, passageId);
       const activeVersion = versions.find((v) => v.audioKey === passage.audioKey)!;
 
@@ -181,10 +181,9 @@ export default function ReplaceAIPage() {
       setRenderedBlob(renderedBlob);
       setHasUnversionedRendering(!!unversionedBlob);
 
-      const unversioned = replacementsFromDB.filter((r) => r.versionId === null);
-      if (unversioned.length > 0) {
-        setReplacements(unversioned);
-        setActiveReplacements(unversioned);
+      if (unversionedReplacements.length > 0) {
+        setReplacements(unversionedReplacements);
+        setActiveReplacements(unversionedReplacements);
       } else {
         // No unversioned replacements — make unversioned copies of active replacements
         // Copy each replacement as unversioned (no versionId)
