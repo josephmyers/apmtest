@@ -772,7 +772,7 @@ export default function ReplaceAIPage() {
 
       <Box sx={{ px: 2, pb: 3 }}>
         {showRendered ? (
-          <Button fullWidth variant="primary" onClick={handleUseThisVersion}>
+          <Button fullWidth variant="primary" onClick={handleUseThisVersion} disabled={!hasUnversionedRendering}>
             Use This Version
           </Button>
         ) : (
