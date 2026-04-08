@@ -28,6 +28,7 @@ import {
   associateReplacementsWithVersion,
   createPassageVersion,
   deleteUnversionedReplacements,
+  discardUnversionedRendering,
   fetchAudio,
   fetchVersionAudio,
   fetchUnversionedRendering,
@@ -407,6 +408,7 @@ const haveReplacementsChanged = useMemo(() => {
 
   const [confirmRenderOpen, setConfirmRenderOpen] = useState(false);
   const [confirmExitOpen, setConfirmExitOpen] = useState(false); // I'm pretty sure we still need this
+  const [confirmDiscardExitOpen, setConfirmDiscardExitOpen] = useState(false);
 
   const handleRenderClick = () => {
     if (hasUnversionedRendering) {
@@ -471,6 +473,23 @@ const haveReplacementsChanged = useMemo(() => {
     a.click();
     URL.revokeObjectURL(url);
     setMenuAnchorEl(null);
+  };
+
+  const handleDiscardAndExit = () => {
+    setMenuAnchorEl(null);
+    setConfirmDiscardExitOpen(true);
+  };
+
+  const confirmDiscardAndExit = async () => {
+    setConfirmDiscardExitOpen(false);
+    setIsBusy(true);
+    try {
+      await deleteUnversionedReplacements(token!, passageId);
+      await discardUnversionedRendering(token!, passageId);
+      navigate("/record", { state });
+    } finally {
+      setIsBusy(false);
+    }
   };
 
   const handleEditClick = (r: Replacement) => {
@@ -622,6 +641,7 @@ const haveReplacementsChanged = useMemo(() => {
             onClose={() => setMenuAnchorEl(null)}
           >
             <MenuItem onClick={handleDownloadAudio}>Download Audio</MenuItem>
+            <MenuItem onClick={handleDiscardAndExit}>Discard and Exit</MenuItem>
           </Menu>
         </Box>
       </PageHeader>
@@ -807,6 +827,31 @@ const haveReplacementsChanged = useMemo(() => {
         <DialogActions>
           <Button onClick={() => setConfirmExitOpen(false)} variant="primary">Cancel</Button>
           <Button onClick={confirmExit}>Confirm</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ─── Confirm Discard And Exit Dialog ──────────────── */}
+      <Dialog
+        open={confirmDiscardExitOpen}
+        onClose={() => setConfirmDiscardExitOpen(false)}
+      >
+        <DialogContent>
+          <DialogContentText>
+            All your progress will be permanently deleted. Replacement markings
+            and rendered audio not selected for "Use This Version" will be removed.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setConfirmDiscardExitOpen(false)}
+            variant="primary"
+            disabled={isBusy}
+          >
+            Cancel
+          </Button>
+          <Button onClick={confirmDiscardAndExit} disabled={isBusy}>
+            Confirm
+          </Button>
         </DialogActions>
       </Dialog>
 

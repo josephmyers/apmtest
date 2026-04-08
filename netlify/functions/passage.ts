@@ -94,5 +94,26 @@ export default async function handler(req: Request, _context: Context) {
     return json({ success: true });
   }
 
+  // DELETE /passage?passageId=123&discardUnversioned=1 — remove staged rendering and clear DB field
+  if (req.method === "DELETE") {
+    const passageId = Number(url.searchParams.get("passageId"));
+    if (!passageId) return json({ error: "passageId is required" }, 400);
+    if (url.searchParams.get("discardUnversioned") !== "1") {
+      return json({ error: "discardUnversioned=1 is required" }, 400);
+    }
+
+    const rows = await sql`SELECT unversioned_rendering FROM passages WHERE id = ${passageId}`;
+    if (rows.length === 0) return json({ error: "Passage not found" }, 404);
+
+    const key = rows[0].unversioned_rendering;
+    if (key) {
+      const store = getStore("audio");
+      await store.delete(key);
+    }
+
+    await sql`UPDATE passages SET unversioned_rendering = NULL WHERE id = ${passageId}`;
+    return json({ success: true });
+  }
+
   return json({ error: "Method not allowed" }, 405);
 }

@@ -469,6 +469,23 @@ export async function storePassageStaged(
   return data;
 }
 
+export async function discardUnversionedRendering(
+  token: string,
+  passageId: number,
+): Promise<{ success: boolean }> {
+  const res = await fetch(
+    `${API_BASE}/passage?passageId=${passageId}&discardUnversioned=1`,
+    {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    },
+  );
+  const data = await res.json();
+  if (!res.ok)
+    throw new Error(data.error || "Failed to discard staged rendering");
+  return data;
+}
+
 export async function fetchUnversionedRendering(
   token: string,
   passageId: number,
