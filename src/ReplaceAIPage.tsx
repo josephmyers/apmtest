@@ -122,13 +122,13 @@ export default function ReplaceAIPage() {
   const [saving, setSaving] = useState(false);
   const [editingReplacement, setEditingReplacement] =
     useState<Replacement | null>(null);
-  const [rendering, setRendering] = useState(false);
   const [renderedBlob, setRenderedBlob] = useState<Blob | null>(null);
   const [showRendered, setShowRendered] = useState(false);
   const [hasUnversionedRendering, setHasUnversionedRendering] = useState(false);
   // The active replacements are not necessarily what's saved in the DB, though they often are. They are the Reset target.
   // If you have unversioned replacements and an unversioned rendering, where DB changes happen immediately, if you edit the replacements, how do you Reset?
   const [activeReplacements, setActiveReplacements] = useState<Replacement[]>([]);
+  const [isBusy, setIsBusy] = useState(true);
 
   const [composedAudio, setComposedAudio] = useState<Blob | null>(null);
   const [highlights, setHighlights] = useState<
@@ -158,6 +158,8 @@ export default function ReplaceAIPage() {
   // Load passage audio, rendered audio, and existing replacements on mount
   useEffect(() => {
     if (!token || !passageId) return;
+    setIsBusy(true);
+    
     fetchVersionAudio(token, passageVersion?.id ?? passageId).then((blob) => {
       if (blob) setPassageAudio({ blob, version: passageVersion });
     });
@@ -201,7 +203,8 @@ export default function ReplaceAIPage() {
         setReplacements(copies.filter(Boolean) as Replacement[]);
         setActiveReplacements(versionedReps);
       }
-
+    }).finally(() => {
+      setIsBusy(false);
     });
   }, [token, passageId]);
 
@@ -420,7 +423,7 @@ export default function ReplaceAIPage() {
     setConfirmRenderOpen(false);
     if (!passageAudio) return;
     const file = new File([passageAudio.blob], "passage.wav", { type: passageAudio.blob.type });
-    setRendering(true);
+    setIsBusy(true);
     try {
       const base64String = await toBase64(file);
       const replacementPayloads = await buildReplacementPayloads(replacements);
@@ -447,7 +450,7 @@ export default function ReplaceAIPage() {
     } catch (err) {
       console.error("renderReplacements error:", err);
     } finally {
-      setRendering(false);
+      setIsBusy(false);
     }
   };
 
@@ -483,27 +486,32 @@ export default function ReplaceAIPage() {
   };
 
   const handleReset = async () => {
-    await deleteUnversionedReplacements(token!, passageId);
-    const resaved = await Promise.all(
-      activeReplacements.map(async (r) => {
-        const { replacement } = await saveReplacement(
-          token!, passageId, r.title, r.note, r.name,
-          r.selection.start, r.selection.end, r.audio, r.original,
-        );
-        return { ...r, id: replacement.id };
-      }),
-    );
-    setReplacements(resaved);
-    setActiveReplacements(resaved);
+    setIsBusy(true);
+    try {
+      await deleteUnversionedReplacements(token!, passageId);
+      const resaved = await Promise.all(
+        activeReplacements.map(async (r) => {
+          const { replacement } = await saveReplacement(
+            token!, passageId, r.title, r.note, r.name,
+            r.selection.start, r.selection.end, r.audio, r.original,
+          );
+          return { ...r, id: replacement.id };
+        }),
+      );
+      setReplacements(resaved);
+      setActiveReplacements(resaved);
 
-    // if there's an unversioned blob, that's the latest; otherwise, the currently used audio is the reset target
-    const unversionedBlob = await fetchUnversionedRendering(token!, passageId);
-    const renderedBlob = unversionedBlob ?? await fetchAudio(token!, passageId);
-    setRenderedBlob(renderedBlob);
-    setHasUnversionedRendering(!!unversionedBlob);
+      // if there's an unversioned blob, that's the latest; otherwise, the currently used audio is the reset target
+      const unversionedBlob = await fetchUnversionedRendering(token!, passageId);
+      const renderedBlob = unversionedBlob ?? await fetchAudio(token!, passageId);
+      setRenderedBlob(renderedBlob);
+      setHasUnversionedRendering(!!unversionedBlob);
 
-    playerRef.current?.setTime(0);
-    playerRef.current?.updateSelection(null);
+      playerRef.current?.setTime(0);
+      playerRef.current?.updateSelection(null);
+    } finally {
+      setIsBusy(false);
+    }
   };
 
   const previousRecordings = useMemo(
@@ -559,6 +567,13 @@ export default function ReplaceAIPage() {
         height: "100vh",
       }}
     >
+      <Backdrop
+        open={isBusy}
+        sx={{ zIndex: (theme) => theme.zIndex.modal + 1 }}
+      >
+        <CircularProgress color="inherit" />
+      </Backdrop>
+
       {/* ─── Header ───────────────────────────────────────────── */}
       <PageHeader title={projectName} onBack={handleBack}>
         <Box
@@ -571,12 +586,6 @@ export default function ReplaceAIPage() {
             gap: 1,
           }}
         >
-          <Backdrop
-            open={rendering}
-            sx={{ zIndex: (theme) => theme.zIndex.modal + 1 }}
-          >
-            <CircularProgress color="inherit" />
-          </Backdrop>
           <GraphicEqIcon />
           <Typography sx={{ fontWeight: 600 }}>Replace (AI)</Typography>
 
