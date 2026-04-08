@@ -784,6 +784,11 @@ const haveReplacementsChanged = useMemo(() => {
             Drag to mark the parts you want to replace
           </Typography>
         )}
+        {!showRendered && selection && replacements.length === 0 && (
+          <Typography variant="body2" sx={{ textAlign: "center", my: 16 }}>
+            Tap + to add replacement here
+          </Typography>
+        )}
       </Box>
 
       <Box sx={{ px: 2, pb: 3 }}>
