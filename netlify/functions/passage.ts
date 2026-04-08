@@ -44,7 +44,7 @@ export default async function handler(req: Request, _context: Context) {
 
     if (url.searchParams.get("unversionedAudio") === "1") {
       const rows = await sql`SELECT unversioned_rendering FROM passages WHERE id = ${passageId}`;
-      if (!rows[0]?.unversioned_rendering) return new Response(null, { status: 404 });
+      if (!rows[0]?.unversioned_rendering) return new Response(null, { status: 200 });
       const store = getStore("audio");
       const blob = await store.get(rows[0].unversioned_rendering, { type: "arrayBuffer" });
       if (!blob) return new Response(null, { status: 404 });

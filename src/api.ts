@@ -478,7 +478,9 @@ export async function fetchUnversionedRendering(
     { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" },
   );
   if (res.status === 404 || !res.ok) return null;
-  return await res.blob();
+  const blob = await res.blob();
+  if (blob.size === 0) return null;
+  return blob;
 }
 
 export async function listPassageVersions(
