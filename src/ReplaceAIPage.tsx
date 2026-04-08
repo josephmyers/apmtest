@@ -463,17 +463,17 @@ const haveReplacementsChanged = useMemo(() => {
     navigate("/record", { state });
   };
 
-  const handleDownloadAudio = () => {
-    const blob = showRendered ? renderedBlob : (composedAudio ?? passageAudio?.blob);
-    if (!blob) return;
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${state.passageReference ?? "audio"}.wav`;
-    a.click();
-    URL.revokeObjectURL(url);
-    setMenuAnchorEl(null);
-  };
+  // const handleDownloadAudio = () => {
+  //   const blob = showRendered ? renderedBlob : (composedAudio ?? passageAudio?.blob);
+  //   if (!blob) return;
+  //   const url = URL.createObjectURL(blob);
+  //   const a = document.createElement("a");
+  //   a.href = url;
+  //   a.download = `${state.passageReference ?? "audio"}.wav`;
+  //   a.click();
+  //   URL.revokeObjectURL(url);
+  //   setMenuAnchorEl(null);
+  // };
 
   const handleDiscardAndExit = () => {
     setMenuAnchorEl(null);
@@ -640,7 +640,7 @@ const haveReplacementsChanged = useMemo(() => {
             open={Boolean(menuAnchorEl)}
             onClose={() => setMenuAnchorEl(null)}
           >
-            <MenuItem onClick={handleDownloadAudio}>Download Audio</MenuItem>
+            {/* <MenuItem onClick={handleDownloadAudio}>Download Audio</MenuItem> */}
             <MenuItem onClick={handleDiscardAndExit}>Discard and Exit</MenuItem>
           </Menu>
         </Box>
