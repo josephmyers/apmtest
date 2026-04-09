@@ -138,6 +138,7 @@ export default function ReplaceAIPage() {
     { start: number; end: number; color: string }[]
   >([]);
   const offsetMapRef = useRef<OffsetEntry[]>([]);
+  const pendingExitRef = useRef<{ path: string; options?: { state: any } } | null>(null);
 
 const haveReplacementsChanged = useMemo(() => {
   if (!renderedBlob) return false;
@@ -153,7 +154,12 @@ const haveReplacementsChanged = useMemo(() => {
       r.audio === s.audio
     )
   );
-}, [replacements, activeReplacements]);
+}, [renderedBlob, replacements, activeReplacements]);
+
+  // If they have rendered but unversioned audio, but the replacements have changed since that rendering, it would be very strange to
+  // exit and return to a rendered audio that doesn't match the set of replacements, especially if the rendering is unversioned.
+  // If you have unversioned replacements and an unversioned rendering, where DB changes happen immediately, if you edit the replacements, you can't Reset
+  const shouldGuardNavigation = !!renderedBlob && haveReplacementsChanged;
 
   // Load passage audio, rendered audio, and existing replacements on mount
   useEffect(() => {
@@ -267,24 +273,48 @@ const haveReplacementsChanged = useMemo(() => {
     };
   }, [passageAudio, replacements]);
 
-  const handleBack = () => navigate("/dashboard");
-
-  // If they have rendered but unversioned audio, but the replacements have changed since that rendering, it would be very strange to
-  // exit and return to a rendered audio that doesn't match the set of replacements, especially if the rendering is unversioned.
-  // If you have unversioned replacements and an unversioned rendering, where DB changes happen immediately, if you edit the replacements, how do you Reset?
-  const handleExit = () => {
-    if (renderedBlob && haveReplacementsChanged) {
+  const guardedNavigate = (path: string, options?: { state: any }) => {
+    if (shouldGuardNavigation) {
+      pendingExitRef.current = { path, options };
       setConfirmExitOpen(true);
     } else {
-      navigate("/record", { state });
+      navigate(path, options);
     }
   };
 
   const confirmExit = async () => {
     setConfirmExitOpen(false);
+    const dest = pendingExitRef.current;
+    pendingExitRef.current = null;
+    if (!dest) return;
     await handleReset();
-    navigate("/record", { state });
+    navigate(dest.path, dest.options);
   };
+
+  const handleBack = () => guardedNavigate("/dashboard");
+
+  const handleExit = () => guardedNavigate("/record", { state });
+
+  // Guard browser refresh / tab close
+  useEffect(() => {
+    if (!shouldGuardNavigation) return;
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [shouldGuardNavigation]);
+
+  // Guard browser back button
+  useEffect(() => {
+    if (!shouldGuardNavigation) return;
+    window.history.pushState(null, "", window.location.href);
+    const handler = () => {
+      window.history.pushState(null, "", window.location.href);
+      pendingExitRef.current = { path: "/record", options: { state } };
+      setConfirmExitOpen(true);
+    };
+    window.addEventListener("popstate", handler);
+    return () => window.removeEventListener("popstate", handler);
+  }, [shouldGuardNavigation]);
 
   const handleDialogContinue = async (data: {
     title: string;
