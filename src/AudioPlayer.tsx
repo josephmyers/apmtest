@@ -9,6 +9,7 @@ import WaveSurfer from "wavesurfer.js";
 import RegionsPlugin from "wavesurfer.js/dist/plugins/regions";
 import RecordPlugin from "wavesurfer.js/dist/plugins/record";
 import ZoomPlugin from "wavesurfer.js/dist/plugins/zoom";
+import MinimapPlugin from "wavesurfer.js/dist/plugins/minimap";
 import {
   Box,
   CircularProgress,
@@ -16,6 +17,8 @@ import {
   Menu,
   Stack,
   Typography,
+  useMediaQuery,
+  useTheme,
 } from "@mui/material";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import PauseIcon from "@mui/icons-material/Pause";
@@ -153,6 +156,7 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
     ref,
   ) => {
     const containerRef = useRef<HTMLDivElement>(null);
+    const minimapContainerRef = useRef<HTMLDivElement>(null);
     const wsRef = useRef<WaveSurfer | null>(null);
     const regionsRef = useRef<RegionsPlugin | null>(null);
     const recordRef = useRef<RecordPlugin | null>(null);
@@ -168,6 +172,9 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
       audioSource ?? null,
     );
     const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
+    const [isZoomed, setIsZoomed] = useState(false);
+    const theme = useTheme();
+    const isSmallScreen = useMediaQuery(theme.breakpoints.down("md"));
     const isSelectionSticky = !!stickySelection;
 
     // Undo stack
@@ -338,6 +345,7 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
         height,
         normalize: false,
         plugins,
+        hideScrollbar: isSmallScreen
       };
 
       const renderFunction = createWaveformRenderer(
@@ -366,6 +374,26 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
         setInternalAudio(blob);
         setUndoStack([]);
         onRecordingCompleteRef.current?.(blob);
+      });
+
+      if (enableZoom && minimapContainerRef.current) {
+        ws.registerPlugin(
+          MinimapPlugin.create({
+            container: minimapContainerRef.current,
+            height: 12,
+            waveColor: "#dddddd",
+            progressColor: "#dddddd",
+            cursorWidth: 0,
+            overlayColor: "#c4c4c448",
+          }),
+        );
+      }
+
+      ws.on("zoom", () => {
+        requestAnimationFrame(() => {
+          const wrapper = wsRef.current?.getWrapper();
+          setIsZoomed(wrapper?.parentElement?.scrollWidth! > wrapper?.parentElement?.clientWidth!);
+        });
       });
 
       const container = containerRef.current!;
@@ -776,12 +804,22 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
           sx={{
             minHeight: height,
             bgcolor: "action.hover",
-            my: 1,
+            mt: 1,
             borderRadius: 1,
             overflow: "hidden",
             width: "100%",
           }}
         />
+        {enableZoom && (
+          <Box
+            ref={minimapContainerRef}
+            sx={{
+              height: { xs: 12, sm: 0 },
+              overflow: "hidden",
+              opacity: isZoomed ? 1 : 0,
+            }}
+          />
+        )}
         {children}
       </Box>
     );
