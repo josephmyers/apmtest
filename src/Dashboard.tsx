@@ -22,6 +22,8 @@ import {
   Toolbar,
   Typography,
   CircularProgress,
+  useMediaQuery,
+  useTheme,
 } from "@mui/material";
 import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
@@ -52,6 +54,8 @@ type TabId = "overview" | "audio" | "assignments" | "transcriptions";
 export default function Dashboard() {
   const { user, token, logout } = useAuth();
   const navigate = useNavigate();
+  const theme = useTheme();
+  const isSmallScreen = useMediaQuery(theme.breakpoints.down("md"));
 
   const [activeTab, setActiveTab] = useState<TabId>("overview");
   const [project, setProject] = useState<Project | null>(null);
@@ -157,6 +161,8 @@ export default function Dashboard() {
         <Tabs
           value={activeTab}
           onChange={(_, v) => setActiveTab(v as TabId)}
+          variant={isSmallScreen ? "scrollable" : "standard"}
+          scrollButtons="auto"
           centered
           textColor="primary"
           indicatorColor="primary"
