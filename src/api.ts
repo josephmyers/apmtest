@@ -500,6 +500,19 @@ export async function fetchUnversionedRendering(
   return blob;
 }
 
+export async function activateVersion(
+  token: string,
+  versionId: number,
+): Promise<{ success: boolean }> {
+  const res = await fetch(`${API_BASE}/passage-versions?id=${versionId}`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Failed to activate version");
+  return data;
+}
+
 export async function listPassageVersions(
   token: string,
   passageId: number,

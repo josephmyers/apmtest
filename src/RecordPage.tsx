@@ -17,6 +17,7 @@ import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
 import FolderOpenIcon from "@mui/icons-material/FolderOpen";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import GraphicEqIcon from "@mui/icons-material/GraphicEq";
+import InsertDriveFileOutlinedIcon from "@mui/icons-material/InsertDriveFileOutlined";
 
 import StopIcon from "@mui/icons-material/Stop";
 import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
@@ -25,6 +26,7 @@ import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import { useAuth } from "./AuthContext";
 import {
   fetchAudio,
+  activateVersion,
   createPassageVersion,
   getPassage,
   listPassageVersions,
@@ -38,6 +40,7 @@ import { compressToMp3 } from "./audioUtils";
 import SpeakerDialog from "./SpeakerDialog";
 import { AudioPlayer, type AudioPlayerHandle } from "./AudioPlayer";
 import PageHeader from "./PageHeader";
+import VersionsDialog from "./VersionsDialog";
 
 interface RecordPageState {
   passageId: number;
@@ -79,12 +82,9 @@ function RecordPageInner() {
   const { token } = useAuth();
   const state = (location.state ?? {}) as RecordPageState;
 
-  const passageIdFromQuery = Number(
-    new URLSearchParams(location.search).get("passageId"),
-  );
+  const passageIdFromQuery = Number(new URLSearchParams(location.search).get("passageId"));
   const passageId =
-    state.passageId ||
-    (Number.isFinite(passageIdFromQuery) ? passageIdFromQuery : 0);
+    state.passageId || (Number.isFinite(passageIdFromQuery) ? passageIdFromQuery : 0);
   const passageReference = state.passageReference ?? "Unknown Passage";
   const projectName = state.projectName ?? "";
   const sectionPassages = state.sectionPassages ?? [];
@@ -107,10 +107,11 @@ function RecordPageInner() {
   const [snackMsg, setSnackMsg] = useState<string | null>(null);
 
   const [hasUnversionedRendering, setHasUnversionedRendering] = useState(false);
+  const [versions, setVersions] = useState<PassageVersion[]>([]);
+  const [versionsDialogOpen, setVersionsDialogOpen] = useState(false);
 
   // Passage dropdown state
-  const [passageMenuAnchor, setPassageMenuAnchor] =
-    useState<null | HTMLElement>(null);
+  const [passageMenuAnchor, setPassageMenuAnchor] = useState<null | HTMLElement>(null);
 
   // Speaker state
   const [speakerDialogOpen, setSpeakerDialogOpen] = useState(false);
@@ -139,6 +140,10 @@ function RecordPageInner() {
       getPassage(token, passageId),
       listPassageVersions(token, passageId),
     ]).then(([blob, { passage }, { versions }]) => {
+      const sortedVersions = [...versions].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      );
+      setVersions(sortedVersions);
       if (passage.speaker) setSelectedSpeaker(passage.speaker);
       if (!blob) return;
       const version = versions.find((v) => v.audioKey === passage.audioKey);
@@ -165,9 +170,7 @@ function RecordPageInner() {
       return;
     }
     if (!passageId) {
-      setSnackMsg(
-        "Missing passage ID. Return to Dashboard and open Record from a passage card.",
-      );
+      setSnackMsg("Missing passage ID. Return to Dashboard and open Record from a passage card.");
       return;
     }
     try {
@@ -185,16 +188,18 @@ function RecordPageInner() {
 
       setCompressing(false);
       setUploading(true);
-      const { version } = await createPassageVersion(token, passageId, mp3Blob, { activate: true, speaker: selectedSpeaker! });
+      const { version } = await createPassageVersion(token, passageId, mp3Blob, {
+        activate: true,
+        speaker: selectedSpeaker!,
+      });
 
       // Set audio source for playback
       setPassageAudio({ blob: mp3Blob, version });
+      setVersions((prev) => [version, ...prev.filter((v) => v.id !== version.id)]);
       setRenderSource(null);
       setSnackMsg("Audio saved!");
     } catch (err) {
-      setSnackMsg(
-        err instanceof Error ? err.message : "Failed to process audio",
-      );
+      setSnackMsg(err instanceof Error ? err.message : "Failed to process audio");
     } finally {
       setCompressing(false);
       setUploading(false);
@@ -207,9 +212,7 @@ function RecordPageInner() {
       return;
     }
     if (!passageId) {
-      setSnackMsg(
-        "Missing passage ID. Return to Dashboard and open Record from a passage card.",
-      );
+      setSnackMsg("Missing passage ID. Return to Dashboard and open Record from a passage card.");
       return;
     }
     fileInputRef.current?.click();
@@ -222,9 +225,7 @@ function RecordPageInner() {
       return;
     }
     if (!passageId) {
-      setSnackMsg(
-        "Missing passage ID. Return to Dashboard and open Record from a passage card.",
-      );
+      setSnackMsg("Missing passage ID. Return to Dashboard and open Record from a passage card.");
       return;
     }
     if (!selectedSpeaker) return;
@@ -237,9 +238,7 @@ function RecordPageInner() {
         setRecording(true);
       } catch {
         setWarmingUp(false);
-        setSnackMsg(
-          "Could not access microphone. Please allow microphone access and try again.",
-        );
+        setSnackMsg("Could not access microphone. Please allow microphone access and try again.");
       }
     } else {
       playerRef.current?.stopRecording();
@@ -264,18 +263,39 @@ function RecordPageInner() {
 
       setCompressing(false);
       setUploading(true);
-      const { version } = await createPassageVersion(token!, passageId, mp3Blob, { activate: true, speaker: selectedSpeaker! });
+      const { version } = await createPassageVersion(token!, passageId, mp3Blob, {
+        activate: true,
+        speaker: selectedSpeaker!,
+      });
       setPassageAudio({ blob: mp3Blob, version });
+      setVersions((prev) => [version, ...prev.filter((v) => v.id !== version.id)]);
       setRenderSource(null);
       setSnackMsg("Audio saved!");
     } catch (err) {
-      setSnackMsg(
-        err instanceof Error ? err.message : "Failed to process audio",
-      );
+      setSnackMsg(err instanceof Error ? err.message : "Failed to process audio");
     } finally {
       setCompressing(false);
       setUploading(false);
     }
+  }
+
+  async function handleVersionSelected(version: PassageVersion) {
+    if (!token) return;
+    await activateVersion(token, version.id);
+    const blob = await fetchVersionAudio(token, version.id);
+    if (!blob) throw new Error("Could not load audio for this version.");
+    setPassageAudio({ blob, version });
+    const rsVersion = versions.find((v) => v.audioKey === version.renderSource);
+    if (rsVersion) {
+      fetchVersionAudio(token, rsVersion.id).then((rsBlob) => {
+        setRenderSource(rsBlob ? { blob: rsBlob, version: rsVersion } : null);
+      });
+    } else {
+      setRenderSource(null);
+    }
+    setHasUnversionedRendering(false);
+    setVersionsDialogOpen(false);
+    setSnackMsg("Version activated!");
   }
 
   return (
@@ -380,9 +400,7 @@ function RecordPageInner() {
             </Box>
 
             {/* Spacer gives the row its height on large screens (absolute children don't contribute) */}
-            <Box
-              sx={{ height: 30, flex: 1, display: { xs: "none", md: "block" } }}
-            />
+            <Box sx={{ height: 30, flex: 1, display: { xs: "none", md: "block" } }} />
           </Box>
           <Typography sx={{ mt: 1, fontWeight: 500 }}>Record</Typography>
         </Box>
@@ -424,9 +442,7 @@ function RecordPageInner() {
             {selectedSpeaker || "Select Speaker..."}
           </Button>
           <Button
-            startIcon={
-              busy ? <CircularProgress size={18} /> : <FolderOpenIcon />
-            }
+            startIcon={busy ? <CircularProgress size={18} /> : <FolderOpenIcon />}
             sx={{ width: "100%", maxWidth: 260 }}
             disabled={busy || !selectedSpeaker || recording}
             onClick={handleLoadFromFileClick}
@@ -468,16 +484,24 @@ function RecordPageInner() {
             }
             topRowLabel={
               passageAudio?.version.renderSource ? (
-                <Typography
-                  variant="body2"
-                  sx={{ color: "success.main", fontWeight: 500 }}
-                >
+                <Typography variant="body2" sx={{ color: "success.main", fontWeight: 500 }}>
                   AI-Rendered
                 </Typography>
               ) : undefined
             }
           />
         </Box>
+
+        {versions.length > 1 && (
+          <Box sx={{ px: 2, pt: 1 }}>
+            <Button
+              startIcon={<InsertDriveFileOutlinedIcon />}
+              onClick={() => setVersionsDialogOpen(true)}
+            >
+              Versions...
+            </Button>
+          </Box>
+        )}
 
         {/* Spacer pushes record button toward bottom */}
         <Box sx={{ flex: 1 }} />
@@ -502,18 +526,14 @@ function RecordPageInner() {
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              cursor:
-                selectedSpeaker && !busy && !warmingUp ? "pointer" : "default",
+              cursor: selectedSpeaker && !busy && !warmingUp ? "pointer" : "default",
               opacity: selectedSpeaker && !busy ? 1 : 0.6,
               transition: "all 0.2s ease",
-              "&:hover":
-                selectedSpeaker && !busy && !warmingUp ? { opacity: 0.85 } : {},
+              "&:hover": selectedSpeaker && !busy && !warmingUp ? { opacity: 0.85 } : {},
             }}
           >
             {warmingUp && <CircularProgress size={32} sx={{ color: "#fff" }} />}
-            {recording && !warmingUp && (
-              <StopIcon sx={{ color: "#fff", fontSize: 36 }} />
-            )}
+            {recording && !warmingUp && <StopIcon sx={{ color: "#fff", fontSize: 36 }} />}
           </Box>
         </Box>
 
@@ -580,15 +600,26 @@ function RecordPageInner() {
         onSpeakerSelected={(speakerName) => {
           setSelectedSpeaker(speakerName);
           setSpeakers((prev) => {
-            if (prev.some((speaker) => speaker.name === speakerName))
-              return prev;
-            return [...prev, { name: speakerName }].sort((a, b) =>
-              a.name.localeCompare(b.name),
-            );
+            if (prev.some((speaker) => speaker.name === speakerName)) return prev;
+            return [...prev, { name: speakerName }].sort((a, b) => a.name.localeCompare(b.name));
           });
         }}
         onError={setSnackMsg}
       />
+
+      {versionsDialogOpen && (
+        <VersionsDialog
+          open={versionsDialogOpen}
+          token={token!}
+          versions={versions}
+          activeAudioKey={passageAudio?.version.audioKey!}
+          passageReference={passageReference}
+          speakerName={selectedSpeaker!}
+          onClose={() => setVersionsDialogOpen(false)}
+          onMessage={setSnackMsg}
+          onUseVersion={async (v) => await handleVersionSelected(v)}
+        />
+      )}
     </Box>
   );
 }
