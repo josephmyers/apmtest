@@ -82,7 +82,7 @@ function composedToOriginalTime(t: number, offsetMap: OffsetEntry[]): number {
   let prevOffset = 0;
   for (const entry of offsetMap) {
     if (t < entry.composedStart) return t - prevOffset;
-    if (t <= entry.composedEnd) return entry.composedStart - prevOffset;
+    if (t < entry.composedEnd) return entry.composedStart - prevOffset;
     prevOffset = entry.offset;
   }
   return t - prevOffset;
