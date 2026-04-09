@@ -107,6 +107,9 @@ export interface AudioPlayerProps {
   /** Create an unclearable selection region on the waveform */
   stickySelection?: { start: number; end: number };
 
+  /** Stop playback at stickySelection end and seek back to start (default: true) */
+  shouldStopAfterStickySelection?: boolean;
+
   /** Called when the internal audio changes (e.g. recording completed, trash clicked) */
   onAudioChange?: (audio: Blob | null) => void;
 
@@ -146,6 +149,7 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
       showTrash = false,
       showUndo = true,
       stickySelection,
+      shouldStopAfterStickySelection = true,
       onRecordingComplete,
       onAudioChange,
       highlights = [],
@@ -199,6 +203,17 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
     useEffect(() => {
       waveColorRef.current = waveColor;
     }, [waveColor]);
+    const stickySelectionRef = useRef(stickySelection);
+    useEffect(() => {
+      stickySelectionRef.current = stickySelection;
+    }, [stickySelection]);
+    const shouldStopAfterStickySelectionRef = useRef(
+      shouldStopAfterStickySelection,
+    );
+    useEffect(() => {
+      shouldStopAfterStickySelectionRef.current =
+        shouldStopAfterStickySelection;
+    }, [shouldStopAfterStickySelection]);
     const highlightsRef = useRef(highlights);
     useEffect(() => {
       highlightsRef.current = highlights;
@@ -521,10 +536,14 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
       ws.on("timeupdate", (time) => {
         setCurrentTime(time);
         onTimeUpdateRef.current?.(time);
-        // Stop playback at selection end and seek back to start
-        const sel = selectionRef.current;
+        // Stop playback at sticky/regular selection end and seek back to start.
+        const sel =
+          shouldStopAfterStickySelectionRef.current && stickySelectionRef.current
+            ? stickySelectionRef.current
+            : enableDragSelection
+              ? selectionRef.current
+              : null;
         if (
-          enableDragSelection &&
           ws.isPlaying() &&
           sel &&
           sel.start !== sel.end &&

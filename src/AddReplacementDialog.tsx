@@ -215,6 +215,7 @@ export default function AddReplacementDialog({
           audioSource={previewAudio}
           height={60}
           stickySelection={stickySelection}
+          shouldStopAfterStickySelection={!appliedReplacementAudio}
           highlights={[
             ...adjustedHighlights,
             ...(isAudioChanged
