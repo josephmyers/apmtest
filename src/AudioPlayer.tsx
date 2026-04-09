@@ -27,10 +27,15 @@ import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
 import StopIcon from "@mui/icons-material/Stop";
 import ContentCutIcon from "@mui/icons-material/ContentCut";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import VoiceOverOffOutlinedIcon from '@mui/icons-material/VoiceOverOffOutlined';
 import UndoIcon from "@mui/icons-material/Undo";
 import { formatTime } from "./formatTime";
 import { useStopwatch } from "./useStopwatch";
-import { spliceAudio, clampSelectionToHighlights } from "./audioUtils";
+import {
+  spliceAudio,
+  clampSelectionToHighlights,
+  insertSilenceAudio,
+} from "./audioUtils";
 import {
   createWaveformRenderer,
   disableProgressSplit,
@@ -101,6 +106,8 @@ export interface AudioPlayerProps {
   showCut?: boolean;
   /** Show a trash icon in the controls row (default: false) */
   showTrash?: boolean;
+  /** Show a silence icon in the controls row (default: false) */
+  showSilence?: boolean;
   /** Show an undo icon in the controls row (default: true) */
   showUndo?: boolean;
 
@@ -147,6 +154,7 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
       showRecordButton = false,
       showCut = false,
       showTrash = false,
+      showSilence = false,
       showUndo = true,
       stickySelection,
       shouldStopAfterStickySelection = true,
@@ -703,6 +711,13 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
       setPlaying(false);
       setSelection(null);
     };
+    const handleInsertSilenceClick = async () => {
+      if (!internalAudio) return;
+      pushUndo();
+      const withSilence = await insertSilenceAudio(internalAudio, currentTime, 0.5);
+      setInternalAudio(withSilence);
+      wsRef.current?.setTime(currentTime);
+    };
 
     const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
       setMenuAnchorEl(event.currentTarget);
@@ -721,7 +736,7 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
 
     return (
       <Box>
-        <Stack direction="row" alignItems="center" spacing={2}>
+        <Stack direction="row" alignItems="center" spacing={0}>
           {/* Left button: Record/Stop when showRecordButton and no audio (or warming up / actively recording), otherwise Play/Pause */}
           {showRecordButton && (!hasLoadedAudio || isRecording || warmingUp) ? (
             warmingUp ? (
@@ -787,6 +802,17 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
               onClick={handleCutClick}
             >
               <ContentCutIcon fontSize="small" />
+            </IconButton>
+          )}
+          {showSilence && (
+            <IconButton
+              disabled={!hasLoadedAudio || isRecording || warmingUp}
+              size="small"
+              aria-label="insert silence"
+              sx={{ ml: "12px !important" }}
+              onClick={handleInsertSilenceClick}
+            >
+              <VoiceOverOffOutlinedIcon fontSize="small" />
             </IconButton>
           )}
           {showTrash && (

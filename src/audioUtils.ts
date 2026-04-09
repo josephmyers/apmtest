@@ -59,6 +59,58 @@ export async function spliceAudio(
 }
 
 /**
+ * Insert a span of silence into an audio Blob at `atSec`.
+ * Returns a new WAV Blob with all channels and sample rate preserved.
+ */
+export async function insertSilenceAudio(
+  blob: Blob,
+  atSec: number,
+  silenceDurationSec: number,
+): Promise<Blob> {
+  if (silenceDurationSec <= 0) return blob;
+
+  const arrayBuffer = await blob.arrayBuffer();
+  const audioCtx = new AudioContext();
+  const decoded = await audioCtx.decodeAudioData(arrayBuffer);
+
+  const sampleRate = decoded.sampleRate;
+  const numChannels = decoded.numberOfChannels;
+  const insertSample = Math.max(0, Math.min(decoded.length, Math.round(atSec * sampleRate)));
+  const silenceSamples = Math.max(1, Math.round(silenceDurationSec * sampleRate));
+  const newLength = decoded.length + silenceSamples;
+
+  const offlineCtx = new OfflineAudioContext(
+    numChannels,
+    newLength,
+    sampleRate,
+  );
+  const newBuffer = offlineCtx.createBuffer(
+    numChannels,
+    newLength,
+    sampleRate,
+  );
+
+  for (let ch = 0; ch < numChannels; ch++) {
+    const src = decoded.getChannelData(ch);
+    const dst = newBuffer.getChannelData(ch);
+    // Copy segment before insertion.
+    dst.set(src.subarray(0, insertSample), 0);
+    // The inserted section is left as zeros (silence).
+    // Copy segment after insertion.
+    dst.set(src.subarray(insertSample), insertSample + silenceSamples);
+  }
+
+  const source = offlineCtx.createBufferSource();
+  source.buffer = newBuffer;
+  source.connect(offlineCtx.destination);
+  source.start();
+  const rendered = await offlineCtx.startRendering();
+  await audioCtx.close();
+
+  return audioBufferToWav(rendered);
+}
+
+/**
  * Replace a time range in an audio Blob with audio from another Blob.
  * Returns the new WAV Blob and the duration of the replacement segment.
  */

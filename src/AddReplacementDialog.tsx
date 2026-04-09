@@ -205,7 +205,13 @@ export default function AddReplacementDialog({
   })();
 
   return (
-    <Dialog open={open} onClose={(_, reason) => reason !== "backdropClick" && onCancel()} fullWidth maxWidth="sm">
+    <Dialog
+      open={open}
+      onClose={(_, reason) => reason !== "backdropClick" && onCancel()}
+      fullWidth
+      maxWidth="sm"
+      sx={{ "& .MuiDialog-paper": { minWidth: 335 } }}
+    >
       <DialogTitle>
         {editData ? "Edit Replacement" : "Add Replacement"}
       </DialogTitle>
@@ -363,7 +369,7 @@ export default function AddReplacementDialog({
           />
         </Stack>
 
-        {/* ─── Recorder player ──────────────────────────────── */}
+        {/* ─── Replacement waveform ──────────────────────────────── */}
         <AudioPlayer
           ref={replacementPlayerRef}
           audioSource={
@@ -377,6 +383,8 @@ export default function AddReplacementDialog({
           showRecordButton
           showCut
           showTrash
+          showSilence
+          enableZoom={false}
           onAudioChange={setReplacementAudio}
         />
 
