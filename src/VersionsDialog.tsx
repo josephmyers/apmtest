@@ -181,8 +181,18 @@ export default function VersionsDialog({
                       <Typography variant="body2" sx={{ color: "text.secondary" }} noWrap>
                         {passageReference}
                       </Typography>
-                      <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                      <Typography variant="caption" sx={{ color: "text.secondary" }} noWrap>
                         {formatVersionDateTime(version.createdAt)}
+                      </Typography>
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          display: "block",
+                          color: "text.secondary",
+                          height: "20px"
+                        }}
+                      >
+                        {version.note}
                       </Typography>
                     </Box>
                   </Box>

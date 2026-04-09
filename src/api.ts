@@ -419,6 +419,7 @@ export async function createPassageVersion(
     renderSource?: string;
     activate?: boolean;
     speaker?: string;
+    note?: string;
   },
 ): Promise<{ version: PassageVersion }> {
   const params = new URLSearchParams({
@@ -427,6 +428,7 @@ export async function createPassageVersion(
   if (options?.renderSource) params.set("renderSource", options.renderSource);
   if (options?.activate === false) params.set("activate", "0");
   if (options?.speaker) params.set("speaker", options.speaker);
+  if (options?.note) params.set("note", options.note);
   const res = await fetch(`${API_BASE}/passage-versions?${params}`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },

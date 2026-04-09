@@ -15,6 +15,7 @@ import {
   MenuItem,
   Stack,
   Switch,
+  TextField,
   Typography,
 } from "@mui/material";
 import GraphicEqIcon from "@mui/icons-material/GraphicEq";
@@ -131,6 +132,7 @@ export default function ReplaceAIPage() {
   const [activeReplacements, setActiveReplacements] = useState<Replacement[]>([]);
   const [isBusy, setIsBusy] = useState(true);
 
+  const [versionNote, setVersionNote] = useState("");
   const [composedAudio, setComposedAudio] = useState<Blob | null>(null);
   const [highlights, setHighlights] = useState<
     { start: number; end: number; color: string }[]
@@ -174,6 +176,7 @@ const haveReplacementsChanged = useMemo(() => {
         passageId,
         activeVersion.id,
       );
+      setVersionNote(activeVersion.note);
 
       // If there's an unversioned blob, that's the latest; otherwise, use the active audio
       const unversionedBlob = await fetchUnversionedRendering(token!, passageId);
@@ -457,7 +460,7 @@ const haveReplacementsChanged = useMemo(() => {
     if (!renderedBlob) return;
     const { version } = await createPassageVersion(
       token!, passageId, renderedBlob,
-      { renderSource: passageVersion?.audioKey, activate: true },
+      { renderSource: passageVersion?.audioKey, activate: true, note: versionNote },
     );
     await associateReplacementsWithVersion(token!, passageId, version.id);
     navigate("/record", { state });
@@ -780,9 +783,20 @@ const haveReplacementsChanged = useMemo(() => {
 
       <Box sx={{ px: 2, pb: 3 }}>
         {showRendered ? (
-          <Button fullWidth variant="primary" onClick={handleUseThisVersion} disabled={!hasUnversionedRendering}>
-            Use This Version
-          </Button>
+          <>
+            <TextField
+              fullWidth
+              placeholder="Add an optional note for this version..."
+              value={versionNote}
+              onChange={(e) => setVersionNote(e.target.value)}
+              disabled={!hasUnversionedRendering}
+              size="small"
+              sx={{ mb: 1 }}
+            />
+            <Button fullWidth variant="primary" onClick={handleUseThisVersion} disabled={!hasUnversionedRendering}>
+              Use This Version
+            </Button>
+          </>
         ) : (
           <Button
             fullWidth

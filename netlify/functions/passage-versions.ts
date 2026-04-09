@@ -49,6 +49,7 @@ export default async function handler(req: Request, _context: Context) {
 
       let renderSource = url.searchParams.get("renderSource") || null;
       const activate = url.searchParams.get("activate") !== "0";
+      const note = url.searchParams.get("note") || "";
 
       const isRendered = renderSource !== null;
 
@@ -63,8 +64,8 @@ export default async function handler(req: Request, _context: Context) {
 
       // Insert version row to get its ID
       const [version] = await sql`
-        INSERT INTO passage_versions (passage_id, audio_key, render_source)
-        VALUES (${passageId}, '', ${renderSource})
+        INSERT INTO passage_versions (passage_id, audio_key, render_source, note)
+        VALUES (${passageId}, '', ${renderSource}, ${note})
         RETURNING id, created_at
       `;
 
@@ -104,7 +105,7 @@ export default async function handler(req: Request, _context: Context) {
           passageId,
           audioKey: blobKey,
           renderSource,
-          note: "",
+          note,
           createdAt: version.created_at,
         },
       });
