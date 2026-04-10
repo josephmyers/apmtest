@@ -36,6 +36,7 @@ import {
   getSpeakers,
   type Speaker,
   type PassageVersion,
+  deleteUnversionedReplacements,
 } from "./api";
 import { compressToMp3 } from "./audioUtils";
 import SpeakerDialog from "./SpeakerDialog";
@@ -294,6 +295,7 @@ function RecordPageInner() {
     } else {
       setRenderSource(null);
     }
+    deleteUnversionedReplacements(token, passageId);
     setHasUnversionedRendering(false);
     setVersionsDialogOpen(false);
     setSnackMsg("Version activated!");
