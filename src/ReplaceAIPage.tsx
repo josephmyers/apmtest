@@ -479,6 +479,7 @@ const haveReplacementsChanged = useMemo(() => {
       setRenderedBlob(renderedBlob);
       setHasUnversionedRendering(true);
       setShowRendered(true);
+      setVersionNote("");
     } catch (err) {
       console.error("renderReplacements error:", err);
     } finally {
