@@ -61,6 +61,18 @@ export default function VersionsDialog({
     stop();
   }, [open]);
 
+  function handleDialogClose() {
+    stop();
+    onClose();
+  }
+
+  function handleUseVersion() {
+    const selectedVersion = versions.find((v) => v.audioKey === selectedAudioKey);
+    if (!selectedVersion) return;
+    stop();
+    onUseVersion(selectedVersion);
+  }
+
   async function togglePlayVersion(version: PassageVersion) {
     if (!token) return;
 
@@ -154,7 +166,7 @@ export default function VersionsDialog({
   }
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth>
+    <Dialog open={open} onClose={handleDialogClose} fullWidth>
       <DialogTitle>Versions</DialogTitle>
       <DialogContent>
         <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
@@ -286,11 +298,11 @@ export default function VersionsDialog({
         </Box>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
+        <Button onClick={handleDialogClose}>Cancel</Button>
         <Button
           variant="primary"
           disabled={!selectedAudioKey}
-          onClick={() => onUseVersion(versions.find((v) => v.audioKey === selectedAudioKey)!)}
+          onClick={handleUseVersion}
         >
           Use This Version
         </Button>
