@@ -415,7 +415,7 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
       ws.on("zoom", () => {
         requestAnimationFrame(() => {
           const wrapper = wsRef.current?.getWrapper();
-          setIsZoomed(wrapper?.parentElement?.scrollWidth! > wrapper?.parentElement?.clientWidth!);
+          setIsZoomed(wrapper?.parentElement?.scrollWidth! > wrapper?.parentElement?.clientWidth! + 1);
         });
       });
 
