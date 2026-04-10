@@ -207,8 +207,31 @@ export default async function handler(req: Request, _context: Context) {
       });
     }
 
+    // DELETE /passage-versions?id=123 — delete a specific version
     // DELETE /passage-versions?passageId=123 — remove the passage's current audio
     if (method === "DELETE") {
+      const versionId = Number(url.searchParams.get("id"));
+      if (versionId) {
+        const [version] = await sql`
+          SELECT id, passage_id, audio_key FROM passage_versions WHERE id = ${versionId}
+        `;
+        if (!version) return jsonRes({ error: "Version not found" }, 404);
+
+        await store.delete(version.audio_key);
+
+        await sql`
+          DELETE FROM passage_versions WHERE id = ${versionId}
+        `;
+
+        await sql`
+          UPDATE passages
+          SET audio_key = NULL
+          WHERE id = ${version.passage_id} AND audio_key = ${version.audio_key}
+        `;
+
+        return jsonRes({ success: true });
+      }
+
       const passageId = Number(url.searchParams.get("passageId"));
       if (!passageId) return jsonRes({ error: "passageId is required" }, 400);
 

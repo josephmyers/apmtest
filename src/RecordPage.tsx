@@ -28,6 +28,7 @@ import {
   fetchAudio,
   activateVersion,
   createPassageVersion,
+  deletePassageVersion,
   getPassage,
   listPassageVersions,
   fetchVersionAudio,
@@ -296,6 +297,20 @@ function RecordPageInner() {
     setHasUnversionedRendering(false);
     setVersionsDialogOpen(false);
     setSnackMsg("Version activated!");
+  }
+
+  async function handleDeleteVersion(version: PassageVersion) {
+    if (!token) return;
+    await deletePassageVersion(token, version.id);
+    setVersions((prev) => prev.filter((v) => v.id !== version.id));
+    if (passageAudio?.version.id === version.id) {
+      setPassageAudio(null);
+      setRenderSource(null);
+    }
+    if (renderSource?.version.id === version.id) {
+      setRenderSource(null);
+    }
+    setSnackMsg("Version deleted.");
   }
 
   return (
@@ -618,6 +633,7 @@ function RecordPageInner() {
           onClose={() => setVersionsDialogOpen(false)}
           onMessage={setSnackMsg}
           onUseVersion={async (v) => await handleVersionSelected(v)}
+          onDeleteVersion={handleDeleteVersion}
         />
       )}
     </Box>

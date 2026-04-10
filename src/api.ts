@@ -455,6 +455,19 @@ export async function fetchVersionAudio(
   return await res.blob();
 }
 
+export async function deletePassageVersion(
+  token: string,
+  versionId: number,
+): Promise<{ success: boolean }> {
+  const res = await fetch(`${API_BASE}/passage-versions?id=${versionId}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Failed to delete passage version");
+  return data;
+}
+
 export async function storePassageStaged(
   token: string,
   passageId: number,

@@ -10,10 +10,13 @@ import {
   IconButton,
   Radio,
   Typography,
+  useMediaQuery,
+  useTheme,
 } from "@mui/material";
 import PlayCircleOutline from "@mui/icons-material/PlayCircleOutline";
 import StopCircleOutlinedIcon from "@mui/icons-material/StopCircleOutlined";
 import DownloadIcon from "@mui/icons-material/Download";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import { fetchVersionAudio, type PassageVersion } from "./api";
 
 interface VersionsDialogProps {
@@ -26,6 +29,7 @@ interface VersionsDialogProps {
   onClose: () => void;
   onMessage: (message: string) => void;
   onUseVersion: (version: PassageVersion) => void;
+  onDeleteVersion: (version: PassageVersion) => Promise<void>;
 }
 
 export default function VersionsDialog({
@@ -38,10 +42,19 @@ export default function VersionsDialog({
   onClose,
   onMessage,
   onUseVersion,
+  onDeleteVersion,
 }: VersionsDialogProps) {
   const [selectedAudioKey, setSelectedAudioKey] = useState<string>(activeAudioKey);
   const [previewPlayingVersionId, setPreviewPlayingVersionId] = useState<number | null>(null);
+  const [deletingVersionId, setDeletingVersionId] = useState<number | null>(null);
   const previewAudioRef = useRef<HTMLAudioElement | null>(null);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+
+  useEffect(() => {
+    if (!open) return;
+    setSelectedAudioKey(activeAudioKey);
+  }, [activeAudioKey, open]);
 
   useEffect(() => {
     if (open) return;
@@ -121,6 +134,23 @@ export default function VersionsDialog({
     a.download = version.audioKey;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  async function removeVersion(version: PassageVersion) {
+    if (deletingVersionId !== null) return;
+    setDeletingVersionId(version.id);
+    try {
+      stop();
+      await onDeleteVersion(version);
+      if (selectedAudioKey === version.audioKey) {
+        const fallback = versions.find((v) => v.id !== version.id);
+        setSelectedAudioKey(fallback?.audioKey ?? "");
+      }
+    } catch {
+      onMessage("Could not delete this version.");
+    } finally {
+      setDeletingVersionId(null);
+    }
   }
 
   return (
@@ -224,6 +254,18 @@ export default function VersionsDialog({
                           AI-Rendered
                         </Typography>
                       )}
+                      {!isMobile && (
+                        <IconButton
+                          size="small"
+                          disabled={deletingVersionId === version.id}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            removeVersion(version);
+                          }}
+                        >
+                          <DeleteOutlineIcon fontSize="small" />
+                        </IconButton>
+                      )}
                       <Avatar sx={{ width: 28, height: 28, fontSize: 12 }}>
                         {getSpeakerInitials(speakerName)}
                       </Avatar>
@@ -247,6 +289,7 @@ export default function VersionsDialog({
         <Button onClick={onClose}>Cancel</Button>
         <Button
           variant="primary"
+          disabled={!selectedAudioKey}
           onClick={() => onUseVersion(versions.find((v) => v.audioKey === selectedAudioKey)!)}
         >
           Use This Version
