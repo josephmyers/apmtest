@@ -414,7 +414,8 @@ const haveReplacementsChanged = useMemo(() => {
     setSaving(true);
     try {
       await deleteReplacement(token!, id);
-      setReplacements((prev) => prev.filter((r) => r.id !== id));
+      const newReplacements = await getReplacements(token!, passageId, null);
+      setReplacements(newReplacements);
     } catch {
       // deletion failed — leave list unchanged
     } finally {

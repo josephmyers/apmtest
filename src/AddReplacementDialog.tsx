@@ -117,7 +117,7 @@ export default function AddReplacementDialog({
       setStickySelection(selection);
       setHasEverSetReplacement(!!editData);
       setReplacing(false);
-      setOriginalSegmentEnd(editData ? selection.end : null); //todo is selection.end right?
+      setOriginalSegmentEnd(editData ? selection.end : null);
     }
   }, [open]);
 
