@@ -350,7 +350,7 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
         plugins.push(
           ZoomPlugin.create({
             scale: 0.5,
-            maxZoom: 300,
+            maxZoom: 500,
             deltaThreshold: 5,
             exponentialZooming: true,
             iterations: 20,
