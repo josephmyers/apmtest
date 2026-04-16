@@ -102,6 +102,9 @@ export default function Dashboard() {
         display: "flex",
         flexDirection: "column",
         minHeight: "100vh",
+        "@supports (min-height: 100dvh)": {
+          minHeight: "100dvh",
+        },
         bgcolor: "#fafafa",
       }}
     >

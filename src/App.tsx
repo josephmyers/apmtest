@@ -202,6 +202,9 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
           justifyContent: "center",
           alignItems: "center",
           minHeight: "100vh",
+          "@supports (min-height: 100dvh)": {
+            minHeight: "100dvh",
+          },
         }}
       >
         <CircularProgress />
@@ -224,6 +227,9 @@ function AppRoutes() {
           justifyContent: "center",
           alignItems: "center",
           minHeight: "100vh",
+          "@supports (min-height: 100dvh)": {
+            minHeight: "100dvh",
+          },
         }}
       >
         <CircularProgress />

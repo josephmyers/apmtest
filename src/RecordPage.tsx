@@ -310,6 +310,9 @@ function RecordPageInner() {
         display: "flex",
         flexDirection: "column",
         height: "100vh",
+        "@supports (height: 100dvh)": {
+          height: "100dvh",
+        },
       }}
     >
       {/* ─── Header ───────────────────────────────────────────────── */}
