@@ -468,11 +468,13 @@ const haveReplacementsChanged = useMemo(() => {
 
   const handleUseThisVersion = async () => {
     if (!renderedBlob) return;
+    setIsBusy(true);
     const { version } = await createPassageVersion(
       token!, passageId, renderedBlob,
       { renderSource: passageVersion?.audioKey, activate: true, note: versionNote },
     );
     await associateReplacementsWithVersion(token!, passageId, version.id);
+    setIsBusy(false);
     navigate("/record", { state });
   };
 

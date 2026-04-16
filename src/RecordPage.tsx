@@ -26,7 +26,6 @@ import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import { useAuth } from "./AuthContext";
 import {
   fetchAudio,
-  activateVersion,
   createPassageVersion,
   deletePassageVersion,
   getPassage,
@@ -42,7 +41,7 @@ import { compressToMp3 } from "./audioUtils";
 import SpeakerDialog from "./SpeakerDialog";
 import { AudioPlayer, type AudioPlayerHandle } from "./AudioPlayer";
 import PageHeader from "./PageHeader";
-import VersionsDialog from "./VersionsDialog";
+import VersionsDialog, { type UseVersionResult } from "./VersionsDialog";
 
 interface RecordPageState {
   passageId: number;
@@ -281,20 +280,10 @@ function RecordPageInner() {
     }
   }
 
-  async function handleVersionSelected(version: PassageVersion) {
+  async function handleVersionSelected(data: UseVersionResult) {
     if (!token) return;
-    await activateVersion(token, version.id);
-    const blob = await fetchVersionAudio(token, version.id);
-    if (!blob) throw new Error("Could not load audio for this version.");
-    setPassageAudio({ blob, version });
-    const rsVersion = versions.find((v) => v.audioKey === version.renderSource);
-    if (rsVersion) {
-      fetchVersionAudio(token, rsVersion.id).then((rsBlob) => {
-        setRenderSource(rsBlob ? { blob: rsBlob, version: rsVersion } : null);
-      });
-    } else {
-      setRenderSource(null);
-    }
+    setPassageAudio({ blob: data.blob, version: data.version });
+    setRenderSource(data.renderSource);
     deleteUnversionedReplacements(token, passageId);
     setHasUnversionedRendering(false);
     setVersionsDialogOpen(false);
@@ -634,7 +623,7 @@ function RecordPageInner() {
           speakerName={selectedSpeaker!}
           onClose={() => setVersionsDialogOpen(false)}
           onMessage={setSnackMsg}
-          onUseVersion={async (v) => await handleVersionSelected(v)}
+          onUseVersion={handleVersionSelected}
           onDeleteVersion={handleDeleteVersion}
         />
       )}

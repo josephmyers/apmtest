@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import {
   Avatar,
+  Backdrop,
   Box,
   Button,
+  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
@@ -17,7 +19,13 @@ import PlayCircleOutline from "@mui/icons-material/PlayCircleOutline";
 import StopCircleOutlinedIcon from "@mui/icons-material/StopCircleOutlined";
 import DownloadIcon from "@mui/icons-material/Download";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
-import { fetchVersionAudio, type PassageVersion } from "./api";
+import { activateVersion, fetchVersionAudio, type PassageVersion } from "./api";
+
+export interface UseVersionResult {
+  version: PassageVersion;
+  blob: Blob;
+  renderSource: { blob: Blob; version: PassageVersion } | null;
+}
 
 interface VersionsDialogProps {
   open: boolean;
@@ -28,7 +36,7 @@ interface VersionsDialogProps {
   speakerName: string;
   onClose: () => void;
   onMessage: (message: string) => void;
-  onUseVersion: (version: PassageVersion) => void;
+  onUseVersion: (data: UseVersionResult) => void;
   onDeleteVersion: (version: PassageVersion) => Promise<void>;
 }
 
@@ -47,6 +55,7 @@ export default function VersionsDialog({
   const [selectedAudioKey, setSelectedAudioKey] = useState<string>(activeAudioKey);
   const [previewPlayingVersionId, setPreviewPlayingVersionId] = useState<number | null>(null);
   const [deletingVersionId, setDeletingVersionId] = useState<number | null>(null);
+  const [isBusy, setIsBusy] = useState(false);
   const previewAudioRef = useRef<HTMLAudioElement | null>(null);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -66,11 +75,38 @@ export default function VersionsDialog({
     onClose();
   }
 
-  function handleUseVersion() {
+  async function handleUseVersion() {
     const selectedVersion = versions.find((v) => v.audioKey === selectedAudioKey);
-    if (!selectedVersion) return;
-    stop();
-    onUseVersion(selectedVersion);
+    if (!selectedVersion || isBusy) return;
+
+    setIsBusy(true);
+    try {
+      stop();
+      await activateVersion(token, selectedVersion.id);
+
+      const blob = await fetchVersionAudio(token, selectedVersion.id);
+      if (!blob) {
+        onMessage("Could not load audio for this version.");
+        return;
+      }
+
+      let renderSource: { blob: Blob; version: PassageVersion } | null = null;
+      const sourceVersion = versions.find(
+        (v) => v.audioKey === selectedVersion.renderSource,
+      );
+      if (sourceVersion) {
+        const sourceBlob = await fetchVersionAudio(token, sourceVersion.id);
+        if (sourceBlob) {
+          renderSource = { blob: sourceBlob, version: sourceVersion };
+        }
+      }
+
+      onUseVersion({ version: selectedVersion, blob, renderSource });
+    } catch {
+      onMessage("Could not activate this version.");
+    } finally {
+      setIsBusy(false);
+    }
   }
 
   async function togglePlayVersion(version: PassageVersion) {
@@ -149,7 +185,7 @@ export default function VersionsDialog({
   }
 
   async function removeVersion(version: PassageVersion) {
-    if (deletingVersionId !== null) return;
+    if (deletingVersionId !== null || isBusy) return;
     setDeletingVersionId(version.id);
     try {
       stop();
@@ -167,6 +203,9 @@ export default function VersionsDialog({
 
   return (
     <Dialog open={open} onClose={handleDialogClose} fullWidth>
+      <Backdrop open={isBusy} sx={{ zIndex: (theme) => theme.zIndex.modal + 1 }}>
+        <CircularProgress color="inherit" />
+      </Backdrop>
       <DialogTitle>Versions</DialogTitle>
       <DialogContent>
         <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
@@ -204,6 +243,7 @@ export default function VersionsDialog({
                   >
                     <IconButton
                       size="small"
+                      disabled={isBusy}
                       onClick={(event) => {
                         event.stopPropagation();
                         togglePlayVersion(version);
@@ -249,6 +289,7 @@ export default function VersionsDialog({
                   >
                     <IconButton
                       size="small"
+                      disabled={isBusy}
                       onClick={(event) => {
                         event.stopPropagation();
                         download(version);
@@ -269,7 +310,7 @@ export default function VersionsDialog({
                       {!isMobile && (
                         <IconButton
                           size="small"
-                          disabled={deletingVersionId === version.id}
+                          disabled={deletingVersionId === version.id || isBusy}
                           onClick={(event) => {
                             event.stopPropagation();
                             removeVersion(version);
@@ -286,6 +327,7 @@ export default function VersionsDialog({
                 </Box>
 
                 <Radio
+                  disabled={isBusy}
                   checked={selected}
                   onClick={(event) => {
                     event.stopPropagation();
@@ -298,10 +340,10 @@ export default function VersionsDialog({
         </Box>
       </DialogContent>
       <DialogActions>
-        <Button onClick={handleDialogClose}>Cancel</Button>
+        <Button onClick={handleDialogClose} disabled={isBusy}>Cancel</Button>
         <Button
           variant="primary"
-          disabled={!selectedAudioKey}
+          disabled={!selectedAudioKey || isBusy}
           onClick={handleUseVersion}
         >
           Use This Version
