@@ -27,7 +27,7 @@ import {
 interface AddReplacementDialogProps {
   open: boolean;
   /** The original composed passage audio */
-  originalComposedAudio?: Blob;
+  originalComposedAudio: Blob;
   /** The selection range from the parent ReplaceAIPage */
   selection: { start: number; end: number };
   /** The passage speaker */
@@ -113,11 +113,32 @@ export default function AddReplacementDialog({
       setSelectedHistoryId(null);
       setReplacementAudio(null);
       setAppliedReplacementAudio(editData?.audio ?? null);
-      setPreviewAudio(originalComposedAudio);
       setStickySelection(selection);
       setHasEverSetReplacement(!!editData);
       setReplacing(false);
       setOriginalSegmentEnd(editData ? selection.end : null);
+
+      if (editData) {
+        // Source audio doesn't include the edited replacement, so compose an
+        // initial preview by splicing the replacement into the source audio.
+        replaceAudioSegment(
+          originalComposedAudio,
+          selection.start,
+          selection.end,
+          editData.audio,
+        ).then(({ blob, replacementDuration }) => {
+          setPreviewAudio(blob);
+          setStickySelection({
+            start: selection.start,
+            end: selection.start + replacementDuration,
+          });
+        }).catch(() => {
+          // Fallback: show source audio as-is
+          setPreviewAudio(originalComposedAudio);
+        });
+      } else {
+        setPreviewAudio(originalComposedAudio);
+      }
     }
   }, [open]);
 

@@ -177,6 +177,55 @@ export async function replaceAudioSegment(
 }
 
 /**
+ * Compose multiple replacements into a source audio blob in chronological order.
+ * Returns the composed audio blob, replacement highlights, and cumulative offset map.
+ */
+export async function composeReplacements(
+  sourceBlob: Blob,
+  replacements: Array<{ selection: { start: number; end: number }; audio: Blob }>,
+): Promise<{
+  blob: Blob;
+  highlights: { start: number; end: number; color: string }[];
+  offsetMap: { composedStart: number; composedEnd: number; offset: number }[];
+}> {
+  const sorted = [...replacements].sort(
+    (a, b) => a.selection.start - b.selection.start,
+  );
+
+  let current = sourceBlob;
+  let offset = 0;
+  const highlights: { start: number; end: number; color: string }[] = [];
+  const offsetMap: { composedStart: number; composedEnd: number; offset: number }[] = [];
+
+  for (const r of sorted) {
+    const adjustedStart = r.selection.start + offset;
+    const adjustedEnd = r.selection.end + offset;
+    const { blob, replacementDuration } = await replaceAudioSegment(
+      current,
+      adjustedStart,
+      adjustedEnd,
+      r.audio,
+    );
+    current = blob;
+    const replacedDuration = r.selection.end - r.selection.start;
+    offset += replacementDuration - replacedDuration;
+
+    highlights.push({
+      start: adjustedStart,
+      end: adjustedStart + replacementDuration,
+      color: "#ff660091",
+    });
+    offsetMap.push({
+      composedStart: adjustedStart,
+      composedEnd: adjustedStart + replacementDuration,
+      offset,
+    });
+  }
+
+  return { blob: current, highlights, offsetMap };
+}
+
+/**
  * Convert a time coordinate from the preview waveform's time domain to the
  * original audio's time domain.
  *

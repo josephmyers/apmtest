@@ -47,7 +47,7 @@ import AddReplacementDialog from "./AddReplacementDialog";
 import PageHeader from "./PageHeader";
 import { formatTime } from "./formatTime";
 import Axios from "axios";
-import { replaceAudioSegment, compressToMp3, toBase64 } from "./audioUtils";
+import { composeReplacements, compressToMp3, toBase64 } from "./audioUtils";
 import { pollTask } from "./pollTask";
 
 interface ReplaceAIPageState {
@@ -140,6 +140,14 @@ export default function ReplaceAIPage() {
   const offsetMapRef = useRef<OffsetEntry[]>([]);
   const pendingExitRef = useRef<{ path: string; options?: { state: any } } | null>(null);
 
+  // When editing a replacement, holds the composed audio/highlights/offsetMap
+  // computed from all replacements EXCEPT the one being edited.
+  const editSourceRef = useRef<{
+    blob: Blob;
+    highlights: { start: number; end: number; color: string }[];
+    offsetMap: OffsetEntry[];
+  } | null>(null);
+
 const haveReplacementsChanged = useMemo(() => {
   if (!renderedBlob) return false;
   if (replacements.length !== activeReplacements.length) return true;
@@ -226,47 +234,13 @@ const haveReplacementsChanged = useMemo(() => {
 
     let cancelled = false;
 
-    (async () => {
-      const sorted = [...replacements].sort(
-        (a, b) => a.selection.start - b.selection.start,
-      );
-
-      let current = passageAudio.blob;
-      let offset = 0;
-      const newHighlights: { start: number; end: number; color: string }[] = [];
-      const newOffsetMap: OffsetEntry[] = [];
-
-      for (const r of sorted) {
-        const adjustedStart = r.selection.start + offset;
-        const adjustedEnd = r.selection.end + offset;
-        const { blob, replacementDuration } = await replaceAudioSegment(
-          current,
-          adjustedStart,
-          adjustedEnd,
-          r.audio,
-        );
-        current = blob;
-        const replacedDuration = r.selection.end - r.selection.start;
-        offset += replacementDuration - replacedDuration;
-
-        newHighlights.push({
-          start: adjustedStart,
-          end: adjustedStart + replacementDuration,
-          color: "#ff660091",
-        });
-        newOffsetMap.push({
-          composedStart: adjustedStart,
-          composedEnd: adjustedStart + replacementDuration,
-          offset,
-        });
-      }
-
+    composeReplacements(passageAudio.blob, replacements).then((result) => {
       if (!cancelled) {
-        setComposedAudio(current);
-        setHighlights(newHighlights);
-        offsetMapRef.current = newOffsetMap;
+        setComposedAudio(result.blob);
+        setHighlights(result.highlights);
+        offsetMapRef.current = result.offsetMap;
       }
-    })();
+    });
 
     return () => {
       cancelled = true;
@@ -328,9 +302,12 @@ const haveReplacementsChanged = useMemo(() => {
     setSaving(true);
     try {
       const isEdit = !!editingReplacement;
+      // When editing, selection coordinates are in edit-excluded composed time,
+      // so we must use the edit-excluded offset map to convert back to original time.
+      const activeOffsetMap = isEdit ? (editSourceRef.current?.offsetMap ?? []) : offsetMapRef.current;
       const newSelection = {
-        start: composedToOriginalTime(data.selection.start, offsetMapRef.current),
-        end: composedToOriginalTime(data.selection.end, offsetMapRef.current),
+        start: composedToOriginalTime(data.selection.start, activeOffsetMap),
+        end: composedToOriginalTime(data.selection.end, activeOffsetMap),
       };
 
       const audioChanged = !isEdit || data.audio !== editingReplacement.audio;
@@ -403,6 +380,7 @@ const haveReplacementsChanged = useMemo(() => {
       });
       setAddDialogOpen(false);
       setEditingReplacement(null);
+      editSourceRef.current = null;
     } catch {
       // save/update failed — dialog stays open
     } finally {
@@ -515,10 +493,14 @@ const haveReplacementsChanged = useMemo(() => {
     }
   };
 
-  const handleEditClick = (r: Replacement) => {
+  const handleEditClick = async (r: Replacement) => {
+    if (!passageAudio) return;
+    const otherReplacements = replacements.filter((rep) => rep.id !== r.id);
+    editSourceRef.current = await composeReplacements(passageAudio.blob, otherReplacements);
+    // Selection in edit-excluded composed audio time
     setSelection({
-      start: originalToComposedTime(r.selection.start, offsetMapRef.current),
-      end: originalToComposedTime(r.selection.end, offsetMapRef.current),
+      start: originalToComposedTime(r.selection.start, editSourceRef.current.offsetMap),
+      end: originalToComposedTime(r.selection.end, editSourceRef.current.offsetMap),
     });
     setEditingReplacement(r);
     setAddDialogOpen(true);
@@ -894,19 +876,25 @@ const haveReplacementsChanged = useMemo(() => {
       </Dialog>
 
       {/* ─── Add / Edit Replacement Dialog ────────────────── */}
-      {selection && (
+      {selection && addDialogOpen && (
         <AddReplacementDialog
           open={addDialogOpen}
-          originalComposedAudio={composedAudio ?? passageAudio?.blob ?? undefined}
+          originalComposedAudio={
+            editSourceRef.current?.blob ?? composedAudio ?? passageAudio!.blob
+          }
           selection={selection}
           speaker={state.speaker ?? ""}
-          existingHighlights={highlights.filter(
-            // Filter out the existing highlight when editing a replacement
-            (h) => h.start !== selection.start && h.end !== selection.end,
-          )}
+          existingHighlights={
+            editingReplacement
+              ? (editSourceRef.current?.highlights ?? [])
+              : highlights.filter(
+                  (h) => h.start !== selection.start && h.end !== selection.end,
+                )
+          }
           onCancel={() => {
             setAddDialogOpen(false);
             setEditingReplacement(null);
+            editSourceRef.current = null;
           }}
           onContinue={handleDialogContinue}
           editData={editingReplacement ?? undefined}
