@@ -3,6 +3,7 @@ import {
   Accordion,
   AccordionDetails,
   AccordionSummary,
+  Box,
   Button,
   Dialog,
   DialogActions,
@@ -82,6 +83,7 @@ export default function AddReplacementDialog({
     null,
   );
   const [historyExpanded, setHistoryExpanded] = useState(false);
+  const [hasOpenedHistory, setHasOpenedHistory] = useState(false);
   const [playingHistoryId, setPlayingHistoryId] = useState<number | null>(null);
   const historyAudioRef = useRef<HTMLAudioElement | null>(null);
   const [replacementAudio, setReplacementAudio] = useState<Blob | null>(null);
@@ -307,69 +309,87 @@ export default function AddReplacementDialog({
         />
 
         {/* ─── Previous Replacement Recordings ──────────────── */}
-        <Accordion
-          variant="outlined"
-          disabled={previousRecordings.length === 0}
-          expanded={historyExpanded}
-          onChange={(_, expanded) => setHistoryExpanded(expanded)}
-          sx={{ mt: 2 }}
-        >
-          <AccordionSummary expandIcon={<ExpandMore />}>
-            <Typography>
-              Previous Replacements
-            </Typography>
-          </AccordionSummary>
-          <AccordionDetails sx={{ p: 0 }}>
-            <List dense disablePadding sx={{ height: 100, overflowY: "auto" }}>
-              {previousRecordings.map((r) => {
-                const isPlaying = playingHistoryId === r.id;
-                return (
-                  <ListItemButton
-                    key={r.id}
-                    selected={selectedHistoryId === r.id}
-                    onClick={() => {
-                      setSelectedHistoryId(r.id);
-                      setTitle(r.title);
-                      setNote(r.note);
-                      setName(r.name);
-                      setReplacementAudio(r.audio);
-                    }}
-                    sx={{ height: 36, p: 0 }}
-                  >
-                    <IconButton
-                      size="small"
-                      sx={{ width: 36, height: 36, flexShrink: 0, mx: 0.5 }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (isPlaying) {
-                          historyAudioRef.current?.pause();
-                          historyAudioRef.current = null;
-                          setPlayingHistoryId(null);
-                        } else {
-                          historyAudioRef.current?.pause();
-                          const url = URL.createObjectURL(r.audio);
-                          const audio = new Audio(url);
-                          audio.onended = () => {
-                            URL.revokeObjectURL(url);
-                            setPlayingHistoryId(null);
-                          };
-                          historyAudioRef.current = audio;
-                          setPlayingHistoryId(r.id);
-                          audio.play();
-                        }
+        <Box sx={{ position: "relative", mt: 2 }}>
+          {previousRecordings.length > 0 && !hasOpenedHistory && (
+            <Box
+              sx={{
+                position: "absolute",
+                top: -4,
+                right: -4,
+                width: 12,
+                height: 12,
+                borderRadius: "50%",
+                bgcolor: "primary.main",
+                zIndex: 1,
+              }}
+            />
+          )}
+          <Accordion
+            variant="outlined"
+            disabled={previousRecordings.length === 0}
+            expanded={historyExpanded}
+            onChange={(_, expanded) => {
+              setHistoryExpanded(expanded);
+              if (expanded) setHasOpenedHistory(true);
+            }}
+          >
+            <AccordionSummary expandIcon={<ExpandMore />}>
+              <Typography>
+                Previous Replacements
+              </Typography>
+            </AccordionSummary>
+            <AccordionDetails sx={{ p: 0 }}>
+              <List dense disablePadding sx={{ height: 100, overflowY: "auto" }}>
+                {previousRecordings.map((r) => {
+                  const isPlaying = playingHistoryId === r.id;
+                  return (
+                    <ListItemButton
+                      key={r.id}
+                      selected={selectedHistoryId === r.id}
+                      onClick={() => {
+                        setSelectedHistoryId(r.id);
+                        setTitle(r.title);
+                        setNote(r.note);
+                        setName(r.name);
+                        setReplacementAudio(r.audio);
                       }}
+                      sx={{ height: 36, p: 0 }}
                     >
-                      {isPlaying ? <StopCircleOutlined fontSize="small" /> : <PlayCircleOutline fontSize="small" />}
-                    </IconButton>
-                    <ListItemText
-                      primary={`${r.title}${r.note ? ` — ${r.note}` : ""}`}
-                    />
-                  </ListItemButton>
-                );
-              })}
-            </List>
-          </AccordionDetails>
-        </Accordion>
+                      <IconButton
+                        size="small"
+                        sx={{ width: 36, height: 36, flexShrink: 0, mx: 0.5 }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (isPlaying) {
+                            historyAudioRef.current?.pause();
+                            historyAudioRef.current = null;
+                            setPlayingHistoryId(null);
+                          } else {
+                            historyAudioRef.current?.pause();
+                            const url = URL.createObjectURL(r.audio);
+                            const audio = new Audio(url);
+                            audio.onended = () => {
+                              URL.revokeObjectURL(url);
+                              setPlayingHistoryId(null);
+                            };
+                            historyAudioRef.current = audio;
+                            setPlayingHistoryId(r.id);
+                            audio.play();
+                          }
+                        }}
+                      >
+                        {isPlaying ? <StopCircleOutlined fontSize="small" /> : <PlayCircleOutline fontSize="small" />}
+                      </IconButton>
+                      <ListItemText
+                        primary={`${r.title}${r.note ? ` — ${r.note}` : ""}`}
+                      />
+                    </ListItemButton>
+                  );
+                })}
+              </List>
+            </AccordionDetails>
+          </Accordion>
+        </Box>
 
         {/* ─── Title & Note ─────────────────────────────────── */}
         <Stack direction="row" spacing={2} sx={{ my: 2 }}>
