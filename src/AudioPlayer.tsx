@@ -64,6 +64,8 @@ export interface AudioPlayerHandle {
   pushUndo: () => void;
   /** Programmatically set the waveform selection region */
   updateSelection: (sel: { start: number; end: number } | null) => void;
+  /** Reset zoom to the default (all the way out) */
+  resetZoom: () => void;
 }
 
 export interface AudioPlayerProps {
@@ -335,6 +337,10 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
         }
         setSelection(sel);
         fireSelectionChange(sel, "user");
+      },
+      resetZoom: () => {
+        const ws = wsRef.current;
+        if (ws) ws.zoom(1);
       },
     }));
 

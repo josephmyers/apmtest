@@ -373,11 +373,11 @@ const haveReplacementsChanged = useMemo(() => {
           },
         ]);
       }
+      
+      playerRef.current?.updateSelection(null);
+      playerRef.current?.setTime(0);
+      playerRef.current?.resetZoom();
 
-      playerRef.current?.updateSelection({
-        start: data.selection.start,
-        end: data.selection.start + data.replacementDuration,
-      });
       setAddDialogOpen(false);
       setEditingReplacement(null);
       editSourceRef.current = null;
