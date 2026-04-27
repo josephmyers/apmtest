@@ -775,29 +775,40 @@ const haveReplacementsChanged = useMemo(() => {
             ),
           )}
 
-        {/* Spacer */}
-        <Box sx={{ flex: 1 }} />
-
-        {/* Helper text */}
-        {showRendered && (
-          <Typography variant="body2" sx={{ textAlign: "center", my: 16 }}>
-            Review and click Use This Version when ready.
-            <br />
-            Toggle{" "}
-            <Switch size="small" checked sx={{ verticalAlign: "middle" }} /> if
-            you need to go back to editing.
-          </Typography>
-        )}
-        {!showRendered && !selection && replacements.length === 0 && (
-          <Typography variant="body2" sx={{ textAlign: "center", my: 16 }}>
-            Drag to mark the parts you want to replace
-          </Typography>
-        )}
-        {!showRendered && selection && replacements.length === 0 && (
-          <Typography variant="body2" sx={{ textAlign: "center", my: 16 }}>
-            Tap + to add replacement here
-          </Typography>
-        )}
+        {/* Helper text — absolutely positioned so it doesn't shift when rows appear above */}
+        <Box
+          sx={{
+            position: "absolute",
+            top: 400,
+            left: 16,
+            right: 16,
+            textAlign: "center",
+          }}
+        >
+          {showRendered && (
+            <Typography variant="body2">
+              Review and click Use This Version when ready.
+              <br />
+              Toggle{" "}
+              <Switch
+                size="small"
+                checked
+                sx={{ verticalAlign: "middle", pointerEvents: "auto" }}
+              />{" "}
+              if you need to go back to editing.
+            </Typography>
+          )}
+          {!showRendered && !selection && replacements.length === 0 && (
+            <Typography variant="body2">
+              Drag to mark the parts you want to replace
+            </Typography>
+          )}
+          {!showRendered && selection && replacements.length === 0 && (
+            <Typography variant="body2">
+              Tap + to add replacement here
+            </Typography>
+          )}
+        </Box>
       </Box>
 
       <Box sx={{ px: 2, pb: 3 }}>
