@@ -17,7 +17,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { ExpandMore, PlayCircleOutline, StopCircleOutlined } from "@mui/icons-material";
+import { ExpandMore, PlayCircleOutline, PriorityHigh, StopCircleOutlined } from "@mui/icons-material";
 
 import { AudioPlayer, type AudioPlayerHandle } from "./AudioPlayer";
 import {
@@ -309,35 +309,37 @@ export default function AddReplacementDialog({
         />
 
         {/* ─── Previous Replacement Recordings ──────────────── */}
-        <Box sx={{ position: "relative", mt: 2 }}>
-          {previousRecordings.length > 0 && !hasOpenedHistory && (
-            <Box
-              sx={{
-                position: "absolute",
-                top: -4,
-                right: -4,
-                width: 12,
-                height: 12,
-                borderRadius: "50%",
-                bgcolor: "primary.main",
-                zIndex: 1,
-              }}
-            />
-          )}
-          <Accordion
-            variant="outlined"
-            disabled={previousRecordings.length === 0}
-            expanded={historyExpanded}
-            onChange={(_, expanded) => {
-              setHistoryExpanded(expanded);
-              if (expanded) setHasOpenedHistory(true);
-            }}
-          >
-            <AccordionSummary expandIcon={<ExpandMore />}>
-              <Typography>
-                Previous Replacements
-              </Typography>
-            </AccordionSummary>
+        <Accordion
+          variant="outlined"
+          disabled={previousRecordings.length === 0}
+          expanded={historyExpanded}
+          onChange={(_, expanded) => {
+            setHistoryExpanded(expanded);
+            if (expanded) setHasOpenedHistory(true);
+          }}
+          sx={{ mt: 2 }}
+        >
+          <AccordionSummary expandIcon={<ExpandMore />}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <Typography>Previous Replacements</Typography>
+              {previousRecordings.length > 0 && !hasOpenedHistory && (
+                <Box
+                  sx={{
+                    mb: .5,
+                    width: 20,
+                    height: 20,
+                    borderRadius: "50%",
+                    bgcolor: "primary.main",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <PriorityHigh sx={{ color: "white", fontSize: 14 }} />
+                </Box>
+              )}
+            </Box>
+          </AccordionSummary>
             <AccordionDetails sx={{ p: 0 }}>
               <List dense disablePadding sx={{ height: 100, overflowY: "auto" }}>
                 {previousRecordings.map((r) => {
@@ -388,8 +390,7 @@ export default function AddReplacementDialog({
                 })}
               </List>
             </AccordionDetails>
-          </Accordion>
-        </Box>
+        </Accordion>
 
         {/* ─── Title & Note ─────────────────────────────────── */}
         <Stack direction="row" spacing={2} sx={{ my: 2 }}>

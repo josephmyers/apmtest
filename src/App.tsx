@@ -14,7 +14,7 @@ import Dashboard from "./Dashboard";
 import RecordPage from "./RecordPage";
 import ReplaceAIPage from "./ReplaceAIPage";
 
-const PRIMARY_MAIN = "#135CB9";
+const PRIMARY_MAIN = "#1f80ff";
 const RECORD_READY_RED = "#D32F2F";
 
 /** Central width-based breakpoints (px) */
