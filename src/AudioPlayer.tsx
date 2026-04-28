@@ -577,7 +577,7 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
         if (isRecordingRef.current || warmingUpRef.current) return;
         setDuration(d);
         onReadyRef.current?.(d);
-        if (stickySelectionRef.current) ws.zoom(20);
+        if (stickySelectionRef.current && ws.options.minPxPerSec < 20) ws.zoom(20);
 
         if (!regionsRef.current) return;
 
