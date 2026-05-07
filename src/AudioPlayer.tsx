@@ -14,7 +14,10 @@ import {
   Box,
   CircularProgress,
   IconButton,
+  ListItemIcon,
+  ListItemText,
   Menu,
+  MenuItem,
   Stack,
   Typography,
   useMediaQuery,
@@ -733,7 +736,7 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
       setMenuAnchorEl(null);
     };
     const isMenuOpen = Boolean(menuAnchorEl);
-    const hasMenu = React.Children.count(menuItemsProp) > 0;
+    const hasMenu = React.Children.count(menuItemsProp) > 0 || showTrash;
 
     const timeText = formatTimeDisplay
       ? formatTimeDisplay(currentTime, duration)
@@ -822,19 +825,8 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
               <VoiceOverOffOutlinedIcon fontSize="small" />
             </IconButton>
           )}
-          {showTrash && (
-            <IconButton
-              disabled={!hasLoadedAudio || isRecording || warmingUp}
-              size="small"
-              aria-label="delete recording"
-              sx={{ ml: "12px !important" }}
-              onClick={handleTrashClick}
-            >
-              <DeleteOutlineIcon fontSize="small" />
-            </IconButton>
-          )}
           {hasMenu && (
-            <IconButton onClick={handleMenuOpen}>
+            <IconButton onClick={handleMenuOpen} sx={{ ml: "12px !important" }}>
               <MoreVertIcon />
             </IconButton>
           )}
@@ -846,6 +838,20 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
             open={isMenuOpen}
             onClose={handleMenuClose}
           >
+            {showTrash && (
+              <MenuItem
+                disabled={!hasLoadedAudio || isRecording || warmingUp}
+                onClick={() => {
+                  handleMenuClose();
+                  handleTrashClick();
+                }}
+              >
+                <ListItemIcon>
+                  <DeleteOutlineIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>Trash</ListItemText>
+              </MenuItem>
+            )}
             {menuItemsProp}
           </Menu>
         )}
