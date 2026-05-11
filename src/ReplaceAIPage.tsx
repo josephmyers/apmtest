@@ -25,6 +25,7 @@ import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import { useAuth } from "./AuthContext";
+import { useSnackbar } from "./useSnackbar";
 import {
   associateReplacementsWithVersion,
   createPassageVersion,
@@ -58,6 +59,7 @@ interface ReplaceAIPageState {
   //todo remove?
   sectionPassages?: { id: number; reference: string; speaker: string | null }[];
   passageVersion?: PassageVersion | null;
+  initialSelection?: { start: number; end: number } | null;
 }
 
 interface Replacement {
@@ -108,8 +110,11 @@ export default function ReplaceAIPage() {
   const passageId = state.passageId ?? 0;
   const projectName = state.projectName ?? "";
   const passageVersion = state.passageVersion ?? null;
+  const initialSelection = state.initialSelection ?? null;
 
+  const { setSnackMsg, snackbarElement } = useSnackbar();
   const playerRef = useRef<AudioPlayerHandle>(null);
+  const initialSelectionHandled = useRef(false);
   const [passageAudio, setPassageAudio] = useState<{
     blob: Blob;
     version: PassageVersion | null;
@@ -289,6 +294,27 @@ const haveReplacementsChanged = useMemo(() => {
     window.addEventListener("popstate", handler);
     return () => window.removeEventListener("popstate", handler);
   }, [shouldGuardNavigation]);
+
+  useEffect(() => {
+    if (!initialSelection || initialSelectionHandled.current) return;
+    if (isBusy) return;
+    if (replacements.length > 0 && !composedAudio) return;
+
+    initialSelectionHandled.current = true;
+
+    const hasConflict = replacements.some(
+      (r) => initialSelection.start < r.selection.end && initialSelection.end > r.selection.start,
+    );
+    if (hasConflict) {
+      setSnackMsg("Your selection overlaps an existing replacement and can't be applied.");
+      return;
+    }
+
+    playerRef.current?.updateSelection({
+      start: originalToComposedTime(initialSelection.start, offsetMapRef.current),
+      end: originalToComposedTime(initialSelection.end, offsetMapRef.current),
+    });
+  }, [isBusy, composedAudio, replacements]);
 
   const handleDialogContinue = async (data: {
     title: string;
@@ -917,6 +943,8 @@ const haveReplacementsChanged = useMemo(() => {
           previousRecordings={previousRecordings}
         />
       )}
+
+      {snackbarElement}
     </Box>
   );
 }

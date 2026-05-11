@@ -10,9 +10,9 @@ import {
   ListItemText,
   Menu,
   MenuItem,
-  Snackbar,
   Typography,
 } from "@mui/material";
+import { useSnackbar } from "./useSnackbar";
 import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
 import FolderOpenIcon from "@mui/icons-material/FolderOpen";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
@@ -29,13 +29,13 @@ import {
   createPassageVersion,
   deletePassageVersion,
   getPassage,
+  getReplacements,
   listPassageVersions,
   fetchVersionAudio,
-  fetchUnversionedRendering,
+  deleteUnversionedReplacements,
   getSpeakers,
   type Speaker,
   type PassageVersion,
-  deleteUnversionedReplacements,
 } from "./api";
 import { compressToMp3 } from "./audioUtils";
 import SpeakerDialog from "./SpeakerDialog";
@@ -105,9 +105,10 @@ function RecordPageInner() {
   const [warmingUp, setWarmingUp] = useState(false);
   const [compressing, setCompressing] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [snackMsg, setSnackMsg] = useState<string | null>(null);
+  const { setSnackMsg, snackbarElement } = useSnackbar();
+  const [selection, setSelection] = useState<{ start: number; end: number } | null>(null);
 
-  const [hasUnversionedRendering, setHasUnversionedRendering] = useState(false);
+  const [hasUnversionedReplacements, setHasUnversionedReplacements] = useState(false);
   const [versions, setVersions] = useState<PassageVersion[]>([]);
   const [versionsDialogOpen, setVersionsDialogOpen] = useState(false);
 
@@ -158,8 +159,8 @@ function RecordPageInner() {
         });
       }
     });
-    fetchUnversionedRendering(token, passageId).then((blob) => {
-      setHasUnversionedRendering(!!blob);
+    getReplacements(token, passageId, null).then((reps) => {
+      setHasUnversionedReplacements(reps.length > 0);
     });
   }, [token, passageId]);
 
@@ -285,7 +286,7 @@ function RecordPageInner() {
     setPassageAudio({ blob: data.blob, version: data.version });
     setRenderSource(data.renderSource);
     deleteUnversionedReplacements(token, passageId);
-    setHasUnversionedRendering(false);
+    setHasUnversionedReplacements(false);
     setVersionsDialogOpen(false);
     setSnackMsg("Version activated!");
   }
@@ -467,6 +468,7 @@ function RecordPageInner() {
             audioSource={passageAudio?.blob ?? undefined}
             height={80}
             enableDragSelection
+            onSelectionChange={(sel) => setSelection(sel)}
             onRecordingComplete={handleRecordingComplete}
             menuItems={
               <MenuItem
@@ -487,7 +489,7 @@ function RecordPageInner() {
                   <GraphicEqIcon />
                 </ListItemIcon>
                 <ListItemText>
-                  {hasUnversionedRendering ? "Resume Replace (AI)" : "Replace (AI)"}
+                  {hasUnversionedReplacements ? "Resume Replace (AI)" : "Replace (AI)"}
                 </ListItemText>
               </MenuItem>
             }
@@ -512,39 +514,65 @@ function RecordPageInner() {
           </Box>
         )}
 
+        {/* Replace (AI) */}
+        {(hasUnversionedReplacements || selection) && (
+          <Box sx={{ display: "flex", justifyContent: "center", pt: 6 }}>
+            <Button
+              startIcon={<GraphicEqIcon />}
+              onClick={() =>
+                navigate("/replace-ai", {
+                  state: {
+                    passageId,
+                    passageReference,
+                    projectName,
+                    speaker: selectedSpeaker,
+                    sectionPassages,
+                    passageVersion: renderSource?.version ?? passageAudio?.version ?? null,
+                    initialSelection: selection,
+                  },
+                })
+              }
+            >
+              {hasUnversionedReplacements ? "Resume Replace (AI)" : "Replace (AI)"}
+            </Button>
+          </Box>
+        )}
+
         {/* Spacer pushes record button toward bottom */}
         <Box sx={{ flex: 1 }} />
 
-        {/* Record button (disabled, centered) */}
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "center",
-            py: 4,
-          }}
-        >
+        {/* Record */}
+        {!selection && (
           <Box
-            onClick={handleRecordToggle}
             sx={{
-              width: 80,
-              height: 80,
-              borderRadius: "50%",
-              border: recording || warmingUp ? "none" : "25px solid",
-              borderColor: selectedSpeaker ? "alert.main" : "#d0d0d0",
-              bgcolor: recording || warmingUp ? "alert.main" : "transparent",
               display: "flex",
-              alignItems: "center",
               justifyContent: "center",
-              cursor: selectedSpeaker && !busy && !warmingUp ? "pointer" : "default",
-              opacity: selectedSpeaker && !busy ? 1 : 0.6,
-              transition: "all 0.2s ease",
-              "&:hover": selectedSpeaker && !busy && !warmingUp ? { opacity: 0.85 } : {},
+              py: 4,
             }}
           >
-            {warmingUp && <CircularProgress size={32} sx={{ color: "#fff" }} />}
-            {recording && !warmingUp && <StopIcon sx={{ color: "#fff", fontSize: 36 }} />}
+            <Box
+              onClick={handleRecordToggle}
+              sx={{
+                width: 80,
+                height: 80,
+                borderRadius: "50%",
+                border: recording || warmingUp ? "none" : "25px solid",
+                borderColor: selectedSpeaker ? "alert.main" : "#d0d0d0",
+                bgcolor: recording || warmingUp ? "alert.main" : "transparent",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: selectedSpeaker && !busy && !warmingUp ? "pointer" : "default",
+                opacity: selectedSpeaker && !busy ? 1 : 0.6,
+                transition: "all 0.2s ease",
+                "&:hover": selectedSpeaker && !busy && !warmingUp ? { opacity: 0.85 } : {},
+              }}
+            >
+              {warmingUp && <CircularProgress size={32} sx={{ color: "#fff" }} />}
+              {recording && !warmingUp && <StopIcon sx={{ color: "#fff", fontSize: 36 }} />}
+            </Box>
           </Box>
-        </Box>
+        )}
 
         {/* Floating Discussions button */}
         <IconButton
@@ -592,13 +620,7 @@ function RecordPageInner() {
         </Button>
       </Box>
 
-      {/* Snackbar for status messages */}
-      <Snackbar
-        open={!!snackMsg}
-        autoHideDuration={3000}
-        onClose={() => setSnackMsg(null)}
-        message={snackMsg}
-      />
+      {snackbarElement}
 
       <SpeakerDialog
         open={speakerDialogOpen}
