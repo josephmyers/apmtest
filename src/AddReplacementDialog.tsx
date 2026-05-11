@@ -77,6 +77,7 @@ export default function AddReplacementDialog({
   const replacementPlayerRef = useRef<AudioPlayerHandle>(null);
 
   const [title, setTitle] = useState("");
+  const [titleError, setTitleError] = useState(false);
   const [note, setNote] = useState("");
   const [name, setName] = useState("");
   const [selectedHistoryId, setSelectedHistoryId] = useState<number | null>(
@@ -110,6 +111,7 @@ export default function AddReplacementDialog({
   useEffect(() => {
     if (open) {
       setTitle(editData?.title ?? "");
+      setTitleError(false);
       setNote(editData?.note ?? "");
       setName(speaker);
       setSelectedHistoryId(null);
@@ -178,7 +180,8 @@ export default function AddReplacementDialog({
     }
   };
 
-  const handleContinue = () => {
+  const handleSubmit = (e: React.SyntheticEvent) => {
+    e.preventDefault();
     const trimmedTitle = title.trim();
     const trimmedNote = note.trim();
     const trimmedName = name.trim();
@@ -234,6 +237,17 @@ export default function AddReplacementDialog({
       fullWidth
       maxWidth="sm"
       sx={{ "& .MuiDialog-paper": { minWidth: 335 } }}
+      slotProps={{
+        paper: {
+          component: "form",
+          onSubmit: handleSubmit,
+          onInvalid: (e: React.SyntheticEvent) => {
+            if ((e.target as HTMLInputElement).name === "title") {
+              setTitleError(true);
+            }
+          },
+        },
+      }}
     >
       <DialogTitle>
         {editData ? "Edit Replacement" : "Add Replacement"}
@@ -395,10 +409,15 @@ export default function AddReplacementDialog({
         {/* ─── Title & Note ─────────────────────────────────── */}
         <Stack direction="row" spacing={2} sx={{ my: 2 }}>
           <TextField
+            name="title"
             label="Title"
             required
+            error={titleError}
             value={title}
-            onChange={(e) => setTitle(e.target.value)}
+            onChange={(e) => {
+              setTitle(e.target.value);
+              if (titleError && e.target.value.trim()) setTitleError(false);
+            }}
             sx={{ flex: 1 }}
             size="small"
           />
@@ -457,9 +476,9 @@ export default function AddReplacementDialog({
       <DialogActions>
         <Button onClick={onCancel}>Cancel</Button>
         <Button
+          type="submit"
           variant={canContinue ? "primary" : undefined}
-          disabled={!title.trim() || !isAudioChanged}
-          onClick={handleContinue}
+          disabled={!isAudioChanged}
         >
           Continue
         </Button>
