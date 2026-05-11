@@ -849,7 +849,7 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
                 <ListItemIcon>
                   <DeleteOutlineIcon fontSize="small" />
                 </ListItemIcon>
-                <ListItemText>Trash</ListItemText>
+                <ListItemText>Reset Audio</ListItemText>
               </MenuItem>
             )}
             {menuItemsProp}
