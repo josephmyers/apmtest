@@ -826,7 +826,7 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
             </IconButton>
           )}
           {hasMenu && (
-            <IconButton onClick={handleMenuOpen} sx={{ ml: "12px !important" }}>
+            <IconButton onClick={handleMenuOpen}>
               <MoreVertIcon />
             </IconButton>
           )}
