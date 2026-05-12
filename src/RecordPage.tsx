@@ -20,6 +20,7 @@ import GraphicEqIcon from "@mui/icons-material/GraphicEq";
 import InsertDriveFileOutlinedIcon from "@mui/icons-material/InsertDriveFileOutlined";
 
 import StopIcon from "@mui/icons-material/Stop";
+import PauseIcon from "@mui/icons-material/Pause";
 import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 
@@ -108,6 +109,7 @@ function RecordPageInner() {
   const { setSnackMsg, snackbarElement } = useSnackbar();
   const [selection, setSelection] = useState<{ start: number; end: number } | null>(null);
 
+  const [audioInitialized, setAudioInitialized] = useState(false);
   const [hasUnversionedReplacements, setHasUnversionedReplacements] = useState(false);
   const [versions, setVersions] = useState<PassageVersion[]>([]);
   const [versionsDialogOpen, setVersionsDialogOpen] = useState(false);
@@ -132,7 +134,10 @@ function RecordPageInner() {
 
   // Load existing audio, passage details, and versions on mount
   useEffect(() => {
-    if (!token || !passageId) return;
+    if (!token || !passageId) {
+      setAudioInitialized(true);
+      return;
+    }
     // Use nav-state speaker as fast initial value
     if (state.speaker) {
       setSelectedSpeaker(state.speaker);
@@ -147,10 +152,17 @@ function RecordPageInner() {
       );
       setVersions(sortedVersions);
       if (passage.speaker) setSelectedSpeaker(passage.speaker);
-      if (!blob) return;
+      if (!blob) {
+        setAudioInitialized(true);
+        return;
+      }
       const version = versions.find((v) => v.audioKey === passage.audioKey);
-      if (!version) return;
+      if (!version) {
+        setAudioInitialized(true);
+        return;
+      }
       setPassageAudio({ blob, version });
+      setAudioInitialized(true);
 
       const renderSourceVersion = versions.find((v) => v.audioKey === version.renderSource);
       if (renderSourceVersion) {
@@ -228,10 +240,6 @@ function RecordPageInner() {
     }
     if (!passageId) {
       setSnackMsg("Missing passage ID. Return to Dashboard and open Record from a passage card.");
-      return;
-    }
-    if (selection) {
-      setSnackMsg("Recording is not supported while there is a selected time range.");
       return;
     }
     if (!selectedSpeaker) return;
@@ -553,27 +561,61 @@ function RecordPageInner() {
             py: 4,
           }}
         >
-          <Box
-            onClick={handleRecordToggle}
-            sx={{
-              width: 80,
-              height: 80,
-              borderRadius: "50%",
-              border: recording || warmingUp ? "none" : "25px solid",
-              borderColor: (selectedSpeaker && !selection) ? "alert.main" : "#d0d0d0",
-              bgcolor: recording || warmingUp ? "alert.main" : "transparent",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: selectedSpeaker && !busy && !warmingUp ? "pointer" : "default",
-              opacity: selectedSpeaker && !busy ? 1 : 0.6,
-              transition: "all 0.2s ease",
-              "&:hover": selectedSpeaker && !busy && !warmingUp ? { opacity: 0.85 } : {},
-            }}
-          >
-            {warmingUp && <CircularProgress size={32} sx={{ color: "#fff" }} />}
-            {recording && !warmingUp && <StopIcon sx={{ color: "#fff", fontSize: 36 }} />}
-          </Box>
+          {audioInitialized && (!passageAudio ? (
+            <Box
+              onClick={handleRecordToggle}
+              sx={{
+                width: 80,
+                height: 80,
+                borderRadius: "50%",
+                border: recording || warmingUp ? "none" : "25px solid",
+                borderColor: selectedSpeaker ? "alert.main" : "#d0d0d0",
+                bgcolor: recording || warmingUp ? "alert.main" : "transparent",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: selectedSpeaker && !busy && !warmingUp ? "pointer" : "default",
+                opacity: selectedSpeaker && !busy ? 1 : 0.6,
+                transition: "all 0.2s ease",
+                "&:hover": selectedSpeaker && !busy && !warmingUp ? { opacity: 0.85 } : {},
+              }}
+            >
+              {warmingUp && <CircularProgress size={32} sx={{ color: "#fff" }} />}
+              {recording && !warmingUp && <StopIcon sx={{ color: "#fff", fontSize: 36 }} />}
+            </Box>
+          ) : (
+            <Button
+              onClick={() => {
+                if (selection) {
+                  setSnackMsg("Recording is not supported while there is a selected time range.");
+                  return;
+                }
+                handleRecordToggle();
+              }}
+              sx={{
+                width: 120,
+                height: 64,
+                fontSize: "1.1rem !important",
+                fontWeight: 600,
+                color: selection ? "#9e9e9e" : "alert.main",
+                opacity: selectedSpeaker && !busy ? 1 : 0.6,
+                cursor: selectedSpeaker && !busy && !warmingUp ? "pointer" : "default",
+                
+                "&:hover":
+                  selectedSpeaker && !busy && !warmingUp && !selection
+                    ? {}
+                    : { bgcolor: "#fff" },
+              }}
+            >
+              {warmingUp ? (
+                <CircularProgress size={28} sx={{ color: "alert.main" }} />
+              ) : recording ? (
+                <PauseIcon sx={{ fontSize: 32 }} />
+              ) : (
+                "RERECORD"
+              )}
+            </Button>
+          ))}
         </Box>
 
         {/* Floating Discussions button */}
