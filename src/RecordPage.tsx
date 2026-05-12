@@ -230,6 +230,10 @@ function RecordPageInner() {
       setSnackMsg("Missing passage ID. Return to Dashboard and open Record from a passage card.");
       return;
     }
+    if (selection) {
+      setSnackMsg("Recording is not supported while there is a selected time range.");
+      return;
+    }
     if (!selectedSpeaker) return;
 
     if (!recording) {
@@ -542,37 +546,35 @@ function RecordPageInner() {
         <Box sx={{ flex: 1 }} />
 
         {/* Record */}
-        {!selection && (
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "center",
+            py: 4,
+          }}
+        >
           <Box
+            onClick={handleRecordToggle}
             sx={{
+              width: 80,
+              height: 80,
+              borderRadius: "50%",
+              border: recording || warmingUp ? "none" : "25px solid",
+              borderColor: (selectedSpeaker && !selection) ? "alert.main" : "#d0d0d0",
+              bgcolor: recording || warmingUp ? "alert.main" : "transparent",
               display: "flex",
+              alignItems: "center",
               justifyContent: "center",
-              py: 4,
+              cursor: selectedSpeaker && !busy && !warmingUp ? "pointer" : "default",
+              opacity: selectedSpeaker && !busy ? 1 : 0.6,
+              transition: "all 0.2s ease",
+              "&:hover": selectedSpeaker && !busy && !warmingUp ? { opacity: 0.85 } : {},
             }}
           >
-            <Box
-              onClick={handleRecordToggle}
-              sx={{
-                width: 80,
-                height: 80,
-                borderRadius: "50%",
-                border: recording || warmingUp ? "none" : "25px solid",
-                borderColor: selectedSpeaker ? "alert.main" : "#d0d0d0",
-                bgcolor: recording || warmingUp ? "alert.main" : "transparent",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: selectedSpeaker && !busy && !warmingUp ? "pointer" : "default",
-                opacity: selectedSpeaker && !busy ? 1 : 0.6,
-                transition: "all 0.2s ease",
-                "&:hover": selectedSpeaker && !busy && !warmingUp ? { opacity: 0.85 } : {},
-              }}
-            >
-              {warmingUp && <CircularProgress size={32} sx={{ color: "#fff" }} />}
-              {recording && !warmingUp && <StopIcon sx={{ color: "#fff", fontSize: 36 }} />}
-            </Box>
+            {warmingUp && <CircularProgress size={32} sx={{ color: "#fff" }} />}
+            {recording && !warmingUp && <StopIcon sx={{ color: "#fff", fontSize: 36 }} />}
           </Box>
-        )}
+        </Box>
 
         {/* Floating Discussions button */}
         <IconButton
