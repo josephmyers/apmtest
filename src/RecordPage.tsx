@@ -604,7 +604,8 @@ function RecordPageInner() {
         <Box sx={{ width: 90 }} />
 
         <Button
-          startIcon={<Checkbox size="small" sx={{ p: 0 }} disabled />}
+          startIcon={<Checkbox size="small" sx={{ p: 0, "&.Mui-disabled": { color: "inherit" } }} disabled />}
+          variant="primary"
           onClick={() => {
             /* stub */
           }}
