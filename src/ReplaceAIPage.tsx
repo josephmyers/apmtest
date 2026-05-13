@@ -25,6 +25,7 @@ import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import HideSourceIcon from "@mui/icons-material/HideSource";
+import UndoIcon from "@mui/icons-material/Undo";
 import { useAuth } from "./AuthContext";
 import { useSnackbar } from "./useSnackbar";
 import {
@@ -73,6 +74,8 @@ interface Replacement {
   original: boolean;
   versionId: number | null;
 }
+
+type UndoEntry = { type: "edit" | "delete"; before: Replacement };
 
 interface OffsetEntry {
   composedStart: number;
@@ -139,6 +142,8 @@ export default function ReplaceAIPage() {
   const [isBusy, setIsBusy] = useState(true);
 
   const [versionNote, setVersionNote] = useState("");
+  const [undoStack, setUndoStack] = useState<UndoEntry[]>([]);
+
   const [composedAudio, setComposedAudio] = useState<Blob | null>(null);
   const [highlights, setHighlights] = useState<
     { start: number; end: number; color: string }[]
@@ -317,6 +322,18 @@ const haveReplacementsChanged = useMemo(() => {
     });
   }, [isBusy, composedAudio, replacements]);
 
+  useEffect(() => {
+    if (!selection) return;
+    const hasConflict = replacements.some(
+      (r) => selection.start < r.selection.end && selection.end > r.selection.start,
+    );
+    if (hasConflict) {
+      playerRef.current?.updateSelection(null);
+      playerRef.current?.setTime(0);
+      playerRef.current?.resetZoom();
+    }
+  }, [replacements]);
+
   const handleDialogContinue = async (data: {
     title: string;
     note: string;
@@ -348,6 +365,7 @@ const haveReplacementsChanged = useMemo(() => {
         : undefined;
 
       if (isEdit) {
+        setUndoStack((prev) => [...prev, { type: "edit", before: editingReplacement! }]);
         const { replacement } = await updateReplacement(
           token!,
           editingReplacement.id,
@@ -400,10 +418,6 @@ const haveReplacementsChanged = useMemo(() => {
           },
         ]);
       }
-      
-      playerRef.current?.updateSelection(null);
-      playerRef.current?.setTime(0);
-      playerRef.current?.resetZoom();
 
       setAddDialogOpen(false);
       setEditingReplacement(null);
@@ -416,13 +430,64 @@ const haveReplacementsChanged = useMemo(() => {
   };
 
   const handleDeleteReplacement = async (id: number) => {
+    const target = replacements.find((r) => r.id === id);
+    if (!target) return;
     setSaving(true);
     try {
       await deleteReplacement(token!, id);
-      const newReplacements = await getReplacements(token!, passageId, null);
-      setReplacements(newReplacements);
+      setUndoStack((prev) => [...prev, { type: "delete", before: target }]);
+      setReplacements((prev) => prev.filter((r) => r.id !== id));
     } catch {
-      // deletion failed — leave list unchanged
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleUndo = async () => {
+    const entry = undoStack[undoStack.length - 1];
+    if (!entry) return;
+    setSaving(true);
+    try {
+      if (entry.type === "edit") {
+        const current = replacements.find((r) => r.id === entry.before.id);
+        const audioChanged = current?.audio !== entry.before.audio;
+        await updateReplacement(
+          token!,
+          entry.before.id,
+          entry.before.title,
+          entry.before.note,
+          entry.before.name,
+          entry.before.selection.start,
+          entry.before.selection.end,
+          audioChanged ? entry.before.audio : undefined,
+          entry.before.original,
+        );
+        setReplacements((prev) =>
+          prev.map((r) => (r.id === entry.before.id ? entry.before : r)),
+        );
+        setUndoStack((prev) => prev.slice(0, -1));
+      } else {
+        const { replacement } = await saveReplacement(
+          token!,
+          passageId,
+          entry.before.title,
+          entry.before.note,
+          entry.before.name,
+          entry.before.selection.start,
+          entry.before.selection.end,
+          entry.before.audio,
+          entry.before.original,
+        );
+        const newId = replacement.id;
+        const oldId = entry.before.id;
+        setUndoStack((prev) =>
+          prev.slice(0, -1).map((e) =>
+            e.before.id === oldId ? { ...e, before: { ...e.before, id: newId } } : e,
+          ),
+        );
+        setReplacements((prev) => [...prev, { ...entry.before, id: newId }]);
+      }
+
     } finally {
       setSaving(false);
     }
@@ -484,6 +549,7 @@ const haveReplacementsChanged = useMemo(() => {
       setActiveReplacements([...replacements]);
       setRenderedBlob(renderedBlob);
       setHasUnversionedRendering(true);
+      setUndoStack([]);
       setShowRendered(true);
       setVersionNote("");
     } catch (err) {
@@ -550,6 +616,7 @@ const haveReplacementsChanged = useMemo(() => {
       );
       setReplacements(resaved);
       setActiveReplacements(resaved);
+      setUndoStack([]);
 
       // if there's an unversioned blob, that's the latest; otherwise, the currently used audio is the reset target
       const unversionedBlob = await fetchUnversionedRendering(token!, passageId);
@@ -713,12 +780,14 @@ const haveReplacementsChanged = useMemo(() => {
         {/* Rendered audio toggle / Reset */}
         {renderedBlob && (
           haveReplacementsChanged ? (
-            <Button
-              onClick={handleReset}
-              sx={{ ml: "auto" }}
-            >
-              Reset
-            </Button>
+            <Box sx={{ ml: "auto", display: "flex", alignItems: "center", gap: 1 }}>
+              {undoStack.length > 0 && (
+                <IconButton size="small" onClick={handleUndo}>
+                  <UndoIcon fontSize="small" />
+                </IconButton>
+              )}
+              <Button onClick={handleReset}>Reset</Button>
+            </Box>
           ) : (
             <FormControlLabel
               control={
