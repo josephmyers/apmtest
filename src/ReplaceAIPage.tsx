@@ -24,6 +24,7 @@ import MoreVertIcon from "@mui/icons-material/MoreVert";
 import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import HideSourceIcon from "@mui/icons-material/HideSource";
 import { useAuth } from "./AuthContext";
 import { useSnackbar } from "./useSnackbar";
 import {
@@ -676,7 +677,10 @@ const haveReplacementsChanged = useMemo(() => {
             open={Boolean(menuAnchorEl)}
             onClose={() => setMenuAnchorEl(null)}
           >
-            <MenuItem onClick={handleDiscardAndExit}>Discard and Exit</MenuItem>
+            <MenuItem onClick={handleDiscardAndExit}>
+              <HideSourceIcon fontSize="small" sx={{ mr: 1 }} />
+              Discard and Exit
+            </MenuItem>
           </Menu>
         </Box>
       </PageHeader>
