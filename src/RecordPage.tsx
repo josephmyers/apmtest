@@ -647,7 +647,7 @@ function RecordPageInner() {
 
         <Button
           startIcon={<Checkbox size="small" sx={{ p: 0, "&.Mui-disabled": { color: "inherit" } }} disabled />}
-          variant="primary"
+          variant={selectedSpeaker && passageAudio ? "primary" : undefined}
           onClick={() => {
             /* stub */
           }}
