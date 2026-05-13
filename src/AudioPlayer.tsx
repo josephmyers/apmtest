@@ -63,8 +63,8 @@ export interface AudioPlayerHandle {
   startRecording: () => Promise<void>;
   /** Stop the active recording */
   stopRecording: () => void;
-  /** Push current audio + selection onto the undo stack */
-  pushUndo: () => void;
+  /** Push current audio + selection onto the undo stack, with an optional opaque payload returned to onAudioChange when this entry is restored */
+  pushUndo: (payload?: unknown) => void;
   /** Programmatically set the waveform selection region */
   updateSelection: (sel: { start: number; end: number } | null) => void;
   /** Reset zoom to the default (all the way out) */
@@ -122,8 +122,8 @@ export interface AudioPlayerProps {
   /** Stop playback at stickySelection end and seek back to start (default: true) */
   shouldStopAfterStickySelection?: boolean;
 
-  /** Called when the internal audio changes (e.g. recording completed, trash clicked) */
-  onAudioChange?: (audio: Blob | null) => void;
+  /** Called when the internal audio changes. When the change is an undo restore, undoPayload carries whatever was passed to pushUndo for that entry. */
+  onAudioChange?: (audio: Blob | null, undoPayload?: unknown) => void;
 
   /** Enable mouse-wheel and touch-pinch zoom on the waveform (default: true) */
   enableZoom?: boolean;
@@ -198,10 +198,11 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
     interface UndoEntry {
       audio: Blob | null;
       selection: { start: number; end: number } | null;
+      payload?: unknown;
     }
     const [undoStack, setUndoStack] = useState<UndoEntry[]>([]);
-    const pushUndo = () => {
-      setUndoStack((prev) => [...prev, { audio: internalAudio, selection }]);
+    const pushUndo = (payload?: unknown) => {
+      setUndoStack((prev) => [...prev, { audio: internalAudio, selection, payload }]);
     };
 
     const [selection, setSelection] = useState<{
@@ -284,16 +285,6 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
     useEffect(() => {
       warmingUpRef.current = warmingUp;
     }, [warmingUp]);
-
-    // Fire onAudioChange whenever internalAudio changes (skip the initial render)
-    const isFirstRenderRef = useRef(true);
-    useEffect(() => {
-      if (isFirstRenderRef.current) {
-        isFirstRenderRef.current = false;
-        return;
-      }
-      onAudioChangeRef.current?.(internalAudio);
-    }, [internalAudio]);
 
     // Ref to track whether a region add is programmatic
     const programmaticRef = useRef(false);
@@ -405,6 +396,7 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
       record.on("record-end", (blob: Blob) => {
         setInternalAudio(blob);
         setUndoStack([]);
+        onAudioChangeRef.current?.(blob);
         onRecordingCompleteRef.current?.(blob);
       });
 
@@ -682,6 +674,7 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
       if (!entry) return;
       setUndoStack(stack);
       setInternalAudio(entry.audio);
+      onAudioChangeRef.current?.(entry.audio, entry.payload);
       setSelection(entry.selection);
       fireSelectionChange(entry.selection, "undo");
     };
@@ -702,6 +695,7 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
           if (r.start !== r.end) r.remove();
         });
         setInternalAudio(spliced);
+        onAudioChangeRef.current?.(spliced);
         wsRef.current?.setTime(cutStart);
       } catch {
         // Splice failed — leave audio unchanged
@@ -710,6 +704,7 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
     const handleTrashClick = () => {
       pushUndo();
       setInternalAudio(null);
+      onAudioChangeRef.current?.(null);
       const ws = wsRef.current;
       if (ws) {
         suppressDecodeRef.current = true;
@@ -726,6 +721,7 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
       pushUndo();
       const withSilence = await insertSilenceAudio(internalAudio, currentTime, 0.5);
       setInternalAudio(withSilence);
+      onAudioChangeRef.current?.(withSilence);
       wsRef.current?.setTime(currentTime);
     };
 

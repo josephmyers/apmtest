@@ -95,7 +95,6 @@ export default function AddReplacementDialog({
   );
   /** This is in preview time */
   const [stickySelection, setStickySelection] = useState(selection);
-  const [hasEverSetReplacement, setHasEverSetReplacement] = useState(false);
   const [replacing, setReplacing] = useState(false);
 
   // Tracks where the replacement ends in the original/starting audio's timeline.
@@ -118,7 +117,6 @@ export default function AddReplacementDialog({
       setReplacementAudio(null);
       setAppliedReplacementAudio(editData?.audio ?? null);
       setStickySelection(selection);
-      setHasEverSetReplacement(!!editData);
       setReplacing(false);
       setOriginalSegmentEnd(editData ? selection.end : null);
 
@@ -149,10 +147,9 @@ export default function AddReplacementDialog({
   const handleSetAsReplacement = async () => {
     if (!replacementAudio || !originalComposedAudio) return;
 
-    setHasEverSetReplacement(true);
     setReplacing(true);
     try {
-      passagePlayerRef.current?.pushUndo();
+      passagePlayerRef.current?.pushUndo({ appliedReplacementAudio, originalSegmentEnd });
 
       // stickySelection.start is always in original-time (audio with no replacement).
       // For .end, use the tracked original
@@ -209,6 +206,7 @@ export default function AddReplacementDialog({
     });
   };
 
+  const hasUnappliedChanges = replacementAudio !== appliedReplacementAudio;
   const canApplyReplacement =
     Boolean(replacementAudio) &&
     !replacing &&
@@ -271,9 +269,14 @@ export default function AddReplacementDialog({
                 ]
               : []),
           ]}
-          onAudioChange={(audio) => {
+          onAudioChange={(audio, undoPayload) => {
             setPreviewAudio(audio ?? undefined);
-            if (!audio || (audio === originalComposedAudio && !editData)) {
+            if (undoPayload !== undefined) {
+              const { appliedReplacementAudio: prev, originalSegmentEnd: prevEnd } =
+                undoPayload as { appliedReplacementAudio: Blob | null; originalSegmentEnd: number | null };
+              setAppliedReplacementAudio(prev);
+              setOriginalSegmentEnd(prevEnd);
+            } else if (!audio || audio === originalComposedAudio) {
               setAppliedReplacementAudio(null);
               setOriginalSegmentEnd(null);
             }
@@ -461,7 +464,7 @@ export default function AddReplacementDialog({
           <Button
             disabled={!canApplyReplacement}
             variant={
-              canApplyReplacement && !hasEverSetReplacement
+              canApplyReplacement && hasUnappliedChanges
                 ? "primary"
                 : undefined
             }
@@ -477,7 +480,7 @@ export default function AddReplacementDialog({
         <Button onClick={onCancel}>Cancel</Button>
         <Button
           type="submit"
-          variant={canContinue ? "primary" : undefined}
+          variant={canContinue && !hasUnappliedChanges ? "primary" : undefined}
           disabled={!isAudioChanged}
         >
           Continue
