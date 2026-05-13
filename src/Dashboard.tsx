@@ -16,6 +16,7 @@ import {
   ListItemText,
   Menu,
   MenuItem,
+  Select,
   TextField,
   Tab,
   Tabs,
@@ -161,62 +162,78 @@ export default function Dashboard() {
           ...(addPassageMode && { pointerEvents: "none", opacity: 0.5 }),
         }}
       >
-        <Tabs
-          value={activeTab}
-          onChange={(_, v) => setActiveTab(v as TabId)}
-          variant={isSmallScreen ? "scrollable" : "standard"}
-          scrollButtons="auto"
-          centered
-          textColor="primary"
-          indicatorColor="primary"
-        >
-          <Tab label="Project Overview" value="overview" />
-          <Tab
-            label={
-              <span>
-                Audio
-                <Typography
-                  variant="caption"
-                  display="block"
-                  color="text.secondary"
-                >
-                  {completedAssociations} of {totalAssociations} associations
-                </Typography>
-              </span>
-            }
-            value="audio"
-          />
-          <Tab
-            label={
-              <span>
-                Assignments
-                <Typography
-                  variant="caption"
-                  display="block"
-                  color="text.secondary"
-                >
-                  {completedSections} of {totalSections} sections
-                </Typography>
-              </span>
-            }
-            value="assignments"
-          />
-          <Tab
-            label={
-              <span>
-                Transcriptions
-                <Typography
-                  variant="caption"
-                  display="block"
-                  color="text.secondary"
-                >
-                  {completedPassages} of {totalPassages} passages
-                </Typography>
-              </span>
-            }
-            value="transcriptions"
-          />
-        </Tabs>
+        {isSmallScreen ? (
+          <Box sx={{ px: 2, py: 1 }}>
+            <Select
+              size="small"
+              fullWidth
+              value={activeTab}
+              onChange={(e: { target: { value: string } }) => setActiveTab(e.target.value as TabId)}
+              sx={{bgcolor: "#fff"}}
+            >
+              <MenuItem value="overview">Project Overview</MenuItem>
+              <MenuItem value="audio">Audio</MenuItem>
+              <MenuItem value="assignments">Assignments</MenuItem>
+              <MenuItem value="transcriptions">Transcriptions</MenuItem>
+            </Select>
+          </Box>
+        ) : (
+          <Tabs
+            value={activeTab}
+            onChange={(_, v) => setActiveTab(v as TabId)}
+            variant="standard"
+            centered
+            textColor="primary"
+            indicatorColor="primary"
+          >
+            <Tab label="Project Overview" value="overview" />
+            <Tab
+              label={
+                <span>
+                  Audio
+                  <Typography
+                    variant="caption"
+                    display="block"
+                    color="text.secondary"
+                  >
+                    {completedAssociations} of {totalAssociations} associations
+                  </Typography>
+                </span>
+              }
+              value="audio"
+            />
+            <Tab
+              label={
+                <span>
+                  Assignments
+                  <Typography
+                    variant="caption"
+                    display="block"
+                    color="text.secondary"
+                  >
+                    {completedSections} of {totalSections} sections
+                  </Typography>
+                </span>
+              }
+              value="assignments"
+            />
+            <Tab
+              label={
+                <span>
+                  Transcriptions
+                  <Typography
+                    variant="caption"
+                    display="block"
+                    color="text.secondary"
+                  >
+                    {completedPassages} of {totalPassages} passages
+                  </Typography>
+                </span>
+              }
+              value="transcriptions"
+            />
+          </Tabs>
+        )}
       </Box>
 
       {/* Tab content */}
@@ -261,6 +278,9 @@ function ProjectOverviewTab({
   addPassageMode: boolean;
   setAddPassageMode: React.Dispatch<React.SetStateAction<boolean>>;
 }) {
+  const theme = useTheme();
+  const isSmallScreen = useMediaQuery(theme.breakpoints.down("md"));
+
   const handleAddSection = async () => {
     if (!project || !token) return;
     const nextNumber = project.sections.length + 1;
@@ -344,40 +364,43 @@ function ProjectOverviewTab({
       )}
 
       {/* Action buttons */}
-      <Box
-        sx={{
-          display: "flex",
-          alignItems: "center",
-          gap: 1,
-          px: 1,
-          py: 1.5,
-          bgcolor: "#eee",
-          borderBottom: 1,
-          borderColor: "divider",
-          overflowX: "auto",
-          whiteSpace: "nowrap",
-          "&::-webkit-scrollbar": { height: 7 },
-          "&::-webkit-scrollbar-thumb": { bgcolor: "#ccc", borderRadius: 4 },
-        }}
-      >
-        <Button
-          onClick={handleAddSection}
-          disabled={addPassageMode}
-          sx={{ width: 132, flex: "0 0 auto" }}
+      {!isSmallScreen && (
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+            px: 1,
+            py: 1.5,
+            bgcolor: "#eee",
+            borderBottom: 1,
+            borderColor: "divider",
+            overflowX: "auto",
+            whiteSpace: "nowrap",
+            "&::-webkit-scrollbar": { height: 7 },
+            "&::-webkit-scrollbar-thumb": { bgcolor: "#ccc", borderRadius: 4 },
+          }}
         >
-          Add Section
-        </Button>
-        <Button
-          variant={addPassageMode ? "primary" : undefined}
-          onClick={() => setAddPassageMode((prev) => !prev)}
-          sx={{ width: 132, flex: "0 0 auto" }}
-        >
-          Add Passage
-        </Button>
-        <Button disabled={addPassageMode} sx={{ width: 132, flex: "0 0 auto" }}>
-          Spreadsheet
-        </Button>
-      </Box>
+          <Button
+            onClick={handleAddSection}
+            disabled={addPassageMode}
+            sx={{ width: 132, flex: "0 0 auto" }}
+          >
+            Add Section
+          </Button>
+          <Button
+            variant={addPassageMode ? "primary" : undefined}
+            onClick={() => setAddPassageMode((prev) => !prev)}
+            sx={{ width: 132, flex: "0 0 auto" }}
+          >
+            Add Passage
+          </Button>
+          <Button disabled={addPassageMode} sx={{ width: 132, flex: "0 0 auto" }}>
+            Spreadsheet
+          </Button>
+        </Box>
+      )}
+
 
       {/* Sections */}
       <Box sx={{ p: 3, display: "flex", flexDirection: "column", gap: 4 }}>
