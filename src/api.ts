@@ -14,7 +14,7 @@ export interface Passage {
   sectionId: number;
   reference: string;
   description: string;
-  sortOrder: number;
+  sort_order: number;
   audioKey: string | null;
   unversionedRendering: string | null;
   speaker: string | null;
