@@ -102,9 +102,10 @@ export default function Dashboard() {
       sx={{
         display: "flex",
         flexDirection: "column",
-        minHeight: "100vh",
-        "@supports (min-height: 100dvh)": {
-          minHeight: "100dvh",
+        height: "100vh",
+        overflow: "hidden",
+        "@supports (height: 100dvh)": {
+          height: "100dvh",
         },
         bgcolor: "#fafafa",
       }}
@@ -375,6 +376,9 @@ function ProjectOverviewTab({
             bgcolor: "#eee",
             borderBottom: 1,
             borderColor: "divider",
+            position: "sticky",
+            top: 0,
+            zIndex: 1,
             overflowX: "auto",
             whiteSpace: "nowrap",
             "&::-webkit-scrollbar": { height: 7 },
