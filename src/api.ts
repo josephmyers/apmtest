@@ -349,6 +349,19 @@ export async function createPassage(
   return data;
 }
 
+export async function deletePassage(
+  token: string,
+  passageId: number,
+): Promise<{ success: boolean }> {
+  const res = await fetch(`${API_BASE}/projects?passageId=${passageId}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Failed to delete passage");
+  return data;
+}
+
 export async function renameSection(
   token: string,
   sectionId: number,

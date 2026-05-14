@@ -9,6 +9,7 @@ import {
   assertPassageAccess,
   deleteAudioBlobsForProjects,
   deleteAudioBlobsForSections,
+  deleteAudioBlobsForPassages,
   HttpError,
 } from "./_auth.js";
 
@@ -151,9 +152,11 @@ export default handle(async (req: Request) => {
 
   // DELETE /projects?projectId=N — delete a project (cascade)
   // DELETE /projects?sectionId=N — delete a section (cascade)
+  // DELETE /projects?passageId=N — delete a passage (cascade)
   if (method === "DELETE") {
     const projectId = Number(url.searchParams.get("projectId"));
     const sectionId = Number(url.searchParams.get("sectionId"));
+    const passageId = Number(url.searchParams.get("passageId"));
 
     if (projectId) {
       await assertProjectAccess(sql, user.userId, projectId);
@@ -169,7 +172,14 @@ export default handle(async (req: Request) => {
       return jsonRes({ success: true });
     }
 
-    throw new HttpError(400, "projectId or sectionId is required");
+    if (passageId) {
+      await assertPassageAccess(sql, user.userId, passageId);
+      await deleteAudioBlobsForPassages(sql, [passageId]);
+      await sql`DELETE FROM passages WHERE id = ${passageId}`;
+      return jsonRes({ success: true });
+    }
+
+    throw new HttpError(400, "projectId, sectionId, or passageId is required");
   }
 
   // PATCH /projects — rename a section or passage

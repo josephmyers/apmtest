@@ -38,6 +38,7 @@ import {
   createSection,
   deleteSection,
   createPassage,
+  deletePassage,
   renameSection,
   renamePassage,
   type Passage,
@@ -388,6 +389,9 @@ function ProjectOverviewTab({
               addPassageMode={addPassageMode}
               onInsertPassage={handleAddPassage}
               projectName={project?.name ?? ""}
+              structureEditsAllowed={
+                project.flags?.structureEditsAllowed !== false
+              }
             />
           ))
         )}
@@ -406,6 +410,7 @@ function SectionRow({
   addPassageMode,
   onInsertPassage,
   projectName,
+  structureEditsAllowed,
 }: {
   section: Section;
   token: string | null;
@@ -414,6 +419,7 @@ function SectionRow({
   addPassageMode: boolean;
   onInsertPassage: (sectionId: number, sortOrder: number) => Promise<void>;
   projectName: string;
+  structureEditsAllowed: boolean;
 }) {
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
   const [renameOpen, setRenameOpen] = useState(false);
@@ -477,12 +483,14 @@ function SectionRow({
             </ListItemIcon>
             <ListItemText>Rename...</ListItemText>
           </MenuItem>
-          <MenuItem onClick={handleDelete}>
-            <ListItemIcon>
-              <DeleteIcon fontSize="small" />
-            </ListItemIcon>
-            <ListItemText>Delete...</ListItemText>
-          </MenuItem>
+          {structureEditsAllowed && (
+            <MenuItem onClick={handleDelete}>
+              <ListItemIcon>
+                <DeleteIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>Delete...</ListItemText>
+            </MenuItem>
+          )}
         </Menu>
         <RenameDialog
           open={renameOpen}
@@ -529,6 +537,7 @@ function SectionRow({
                   setLoading={setLoading}
                   onDataChanged={onDataChanged}
                   projectName={projectName}
+                  structureEditsAllowed={structureEditsAllowed}
                 />
                 {/* Trailing + slot after each card */}
                 {addPassageMode && (
@@ -585,6 +594,7 @@ function PassageCard({
   setLoading,
   onDataChanged,
   projectName,
+  structureEditsAllowed,
 }: {
   passage: Passage;
   section: Section;
@@ -593,10 +603,12 @@ function PassageCard({
   setLoading: React.Dispatch<React.SetStateAction<boolean>>;
   onDataChanged: () => Promise<void>;
   projectName: string;
+  structureEditsAllowed: boolean;
 }) {
   const navigate = useNavigate();
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
   const [renameOpen, setRenameOpen] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   const handleRename = async (reference: string) => {
     if (!token) return;
@@ -606,6 +618,20 @@ function PassageCard({
       await onDataChanged();
     } catch (err) {
       console.error("Failed to rename passage", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setConfirmDeleteOpen(false);
+    if (!token) return;
+    setLoading(true);
+    try {
+      await deletePassage(token, passage.id);
+      await onDataChanged();
+    } catch (err) {
+      console.error("Failed to delete passage", err);
     } finally {
       setLoading(false);
     }
@@ -665,6 +691,19 @@ function PassageCard({
               </ListItemIcon>
               <ListItemText>Rename...</ListItemText>
             </MenuItem>
+            {structureEditsAllowed && (
+              <MenuItem
+                onClick={() => {
+                  setMenuAnchor(null);
+                  setConfirmDeleteOpen(true);
+                }}
+              >
+                <ListItemIcon>
+                  <DeleteIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>Delete...</ListItemText>
+              </MenuItem>
+            )}
           </Menu>
           <RenameDialog
             open={renameOpen}
@@ -677,6 +716,28 @@ function PassageCard({
               setRenameOpen(false);
             }}
           />
+          <Dialog
+            open={confirmDeleteOpen}
+            onClose={(_, reason) =>
+              reason !== "backdropClick" && setConfirmDeleteOpen(false)
+            }
+            fullWidth
+            maxWidth="xs"
+          >
+            <DialogTitle>Delete Passage</DialogTitle>
+            <DialogContent>
+              <Typography>
+                Delete passage &ldquo;{passage.reference}&rdquo;? This will
+                permanently remove all of its audio and cannot be undone.
+              </Typography>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setConfirmDeleteOpen(false)}>Cancel</Button>
+              <Button variant="primary" onClick={handleDelete}>
+                Delete
+              </Button>
+            </DialogActions>
+          </Dialog>
         </Box>
         {passage.description && (
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
