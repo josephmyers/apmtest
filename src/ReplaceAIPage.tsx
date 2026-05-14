@@ -160,7 +160,6 @@ export default function ReplaceAIPage() {
   } | null>(null);
 
 const haveReplacementsChanged = useMemo(() => {
-  if (!renderedBlob) return false;
   if (replacements.length !== activeReplacements.length) return true;
   return replacements.some(r =>
     !activeReplacements.find(s =>
@@ -624,12 +623,6 @@ const haveReplacementsChanged = useMemo(() => {
       setActiveReplacements(resaved);
       setUndoStack([]);
 
-      // if there's an unversioned blob, that's the latest; otherwise, the currently used audio is the reset target
-      const unversionedBlob = await fetchUnversionedRendering(token!, passageId);
-      const renderedBlob = unversionedBlob ?? await fetchAudio(token!, passageId);
-      setRenderedBlob(renderedBlob);
-      setHasUnversionedRendering(!!unversionedBlob);
-
       playerRef.current?.setTime(0);
       playerRef.current?.updateSelection(null);
     } finally {
@@ -784,29 +777,29 @@ const haveReplacementsChanged = useMemo(() => {
         />
 
         {/* Rendered audio toggle / Reset */}
-        {renderedBlob && (
-          haveReplacementsChanged ? (
-            <Box sx={{ ml: "auto", display: "flex", alignItems: "center", gap: 1 }}>
-              {undoStack.length > 0 && (
-                <IconButton size="small" onClick={handleUndo}>
-                  <UndoIcon fontSize="small" />
-                </IconButton>
-              )}
-              <Button onClick={handleReset}>Reset</Button>
-            </Box>
+        <Box sx={{ ml: "auto", display: "flex", alignItems: "center", gap: 1 }}>
+          {undoStack.length > 0 && !showRendered && (
+            <IconButton size="small" onClick={handleUndo}>
+              <UndoIcon fontSize="small" />
+            </IconButton>
+          )}
+          {haveReplacementsChanged ? (
+            <Button onClick={handleReset}>Reset</Button>
           ) : (
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={showRendered}
-                  onChange={(_, checked) => setShowRendered(checked)}
-                />
-              }
-              label="See Rendered Audio"
-              sx={{ ml: "auto", mr: 0 }}
-            />
-          )
-        )}
+            renderedBlob && (
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={showRendered}
+                    onChange={(_, checked) => setShowRendered(checked)}
+                  />
+                }
+                label="See Rendered Audio"
+                sx={{ ml: "auto", mr: 0 }}
+              />
+            )
+          )}
+        </Box>
 
         {/* Replacement rows + Add Replacement row in chronological order */}
         {!showRendered &&
