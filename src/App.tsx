@@ -11,6 +11,8 @@ import { darken } from "@mui/material/styles";
 import { AuthProvider, useAuth } from "./AuthContext";
 import LoginPage from "./LoginPage";
 import Dashboard from "./Dashboard";
+import ProjectsPage from "./ProjectsPage";
+import SwitchTeamsPage from "./SwitchTeamsPage";
 import RecordPage from "./RecordPage";
 import ReplaceAIPage from "./ReplaceAIPage";
 
@@ -216,6 +218,13 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function PostLoginRedirect() {
+  const { teams, activeTeamId } = useAuth();
+  if (teams.length === 0) return <Navigate to="/teams" replace />;
+  if (activeTeamId == null) return <Navigate to="/teams" replace />;
+  return <Navigate to="/projects" replace />;
+}
+
 function AppRoutes() {
   const { user, loading } = useAuth();
 
@@ -241,13 +250,29 @@ function AppRoutes() {
     <Routes>
       <Route
         path="/"
-        element={user ? <Navigate to="/dashboard" replace /> : <LoginPage />}
+        element={user ? <PostLoginRedirect /> : <LoginPage />}
       />
       <Route
-        path="/dashboard"
+        path="/projects"
+        element={
+          <ProtectedRoute>
+            <ProjectsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/projects/:projectId"
         element={
           <ProtectedRoute>
             <Dashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/teams"
+        element={
+          <ProtectedRoute>
+            <SwitchTeamsPage />
           </ProtectedRoute>
         }
       />
@@ -267,6 +292,7 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
+      <Route path="/dashboard" element={<Navigate to="/projects" replace />} />
     </Routes>
   );
 }

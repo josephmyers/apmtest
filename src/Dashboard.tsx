@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import {
-  AppBar,
   Backdrop,
   Box,
   Button,
@@ -20,14 +19,11 @@ import {
   TextField,
   Tab,
   Tabs,
-  Toolbar,
   Typography,
   CircularProgress,
   useMediaQuery,
   useTheme,
 } from "@mui/material";
-import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
-import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
@@ -36,9 +32,8 @@ import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
 import AddIcon from "@mui/icons-material/Add";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import { useAuth } from "./AuthContext";
-import appIcon from "./assets/icon.png";
+import PageHeader from "./PageHeader";
 import {
-  getProjects,
   getProject,
   createSection,
   deleteSection,
@@ -53,8 +48,10 @@ import {
 type TabId = "overview" | "audio" | "assignments" | "transcriptions";
 
 export default function Dashboard() {
-  const { user, token, logout } = useAuth();
+  const { token } = useAuth();
   const navigate = useNavigate();
+  const { projectId: projectIdParam } = useParams<{ projectId: string }>();
+  const projectId = Number(projectIdParam);
   const theme = useTheme();
   const isSmallScreen = useMediaQuery(theme.breakpoints.down("md"));
 
@@ -65,27 +62,23 @@ export default function Dashboard() {
   const [addPassageMode, setAddPassageMode] = useState(false);
 
   const loadProject = useCallback(async () => {
-    if (!token) return;
+    if (!token || !projectId) return;
     try {
-      const { projects } = await getProjects(token);
-      if (projects.length > 0) {
-        const { project } = await getProject(token, projects[0].id);
-        setProject(project);
-      }
+      const { project } = await getProject(token, projectId);
+      setProject(project);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to load project");
     }
-  }, [token]);
+  }, [token, projectId]);
 
   useEffect(() => {
+    if (!projectId) {
+      navigate("/projects", { replace: true });
+      return;
+    }
     setLoading(true);
     loadProject().finally(() => setLoading(false));
-  }, [loadProject]);
-
-  const handleLogout = () => {
-    logout();
-    navigate("/");
-  };
+  }, [loadProject, projectId, navigate]);
 
   // Computed stats
   const totalSections = project?.sections.length ?? 0;
@@ -117,42 +110,17 @@ export default function Dashboard() {
         <CircularProgress color="inherit" />
       </Backdrop>
 
-      {/* Top App Bar */}
-      <AppBar
-        position="sticky"
-        color="default"
-        elevation={0}
-        sx={{
-          bgcolor: "#eee",
-          ...(addPassageMode && { pointerEvents: "none", opacity: 0.5 }),
-        }}
-      >
-        <Toolbar sx={{ gap: 1 }}>
-          <Box
-            component="img"
-            src={appIcon}
-            alt="App icon"
-            sx={{ width: 32, height: 32 }}
-          />
-          <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 600 }}>
-            {project?.name ?? "Audio Project Manager"}
-          </Typography>
+      <PageHeader
+        leftIcon="logo"
+        onLeftClick={() => navigate("/projects")}
+        title={project?.name ?? "Audio Project Manager"}
+        rightActions={
           <Button variant="primary" size="small">
             Export
           </Button>
-          <IconButton size="small">
-            <HelpOutlineIcon />
-          </IconButton>
-          <IconButton
-            size="small"
-            onClick={handleLogout}
-            title={`Logout ${user?.email}`}
-            disabled={addPassageMode}
-          >
-            <AccountCircleIcon />
-          </IconButton>
-        </Toolbar>
-      </AppBar>
+        }
+        disabled={addPassageMode}
+      />
 
       {/* Tabs row — pinned / gray background */}
       <Box

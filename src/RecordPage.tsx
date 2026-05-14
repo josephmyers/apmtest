@@ -329,7 +329,11 @@ function RecordPageInner() {
       }}
     >
       {/* ─── Header ───────────────────────────────────────────────── */}
-      <PageHeader title={projectName} onBack={() => navigate("/dashboard")}>
+      <PageHeader
+        leftIcon="back"
+        onLeftClick={() => navigate(-1)}
+        title={projectName}
+      >
         {/* Racetrack row */}
         <Box
           sx={{

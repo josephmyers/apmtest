@@ -1,14 +1,23 @@
+import { sql } from 'drizzle-orm';
 import { boolean, doublePrecision, integer, pgTable, varchar, text, timestamp, serial } from 'drizzle-orm/pg-core';
+
+export const teams = pgTable('teams', {
+    id: serial('id').primaryKey(),
+    name: varchar('name', { length: 255 }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+});
 
 export const users = pgTable('users', {
     id: serial('id').primaryKey(),
     email: varchar('email', { length: 255 }).unique().notNull(),
-    passwordHash: varchar('password_hash', { length: 255 }).notNull(),
+    passwordHash: varchar('password_hash', { length: 255 }),
+    teamIds: integer('team_ids').array().notNull().default(sql`'{}'::int[]`),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 });
 
 export const projects = pgTable('projects', {
     id: serial('id').primaryKey(),
+    teamId: integer('team_id').notNull().references(() => teams.id, { onDelete: 'cascade' }),
     name: varchar('name', { length: 255 }).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 });

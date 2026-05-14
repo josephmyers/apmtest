@@ -149,7 +149,7 @@ export default function ReplaceAIPage() {
     { start: number; end: number; color: string }[]
   >([]);
   const offsetMapRef = useRef<OffsetEntry[]>([]);
-  const pendingExitRef = useRef<{ path: string; options?: { state: any } } | null>(null);
+  const pendingExitRef = useRef<{ path: string | number; options?: { state: any } } | null>(null);
 
   // When editing a replacement, holds the composed audio/highlights/offsetMap
   // computed from all replacements EXCEPT the one being edited.
@@ -258,10 +258,12 @@ const haveReplacementsChanged = useMemo(() => {
     };
   }, [passageAudio, replacements]);
 
-  const guardedNavigate = (path: string, options?: { state: any }) => {
+  const guardedNavigate = (path: string | number, options?: { state: any }) => {
     if (shouldGuardNavigation) {
       pendingExitRef.current = { path, options };
       setConfirmExitOpen(true);
+    } else if (typeof path === "number") {
+      navigate(path);
     } else {
       navigate(path, options);
     }
@@ -273,10 +275,14 @@ const haveReplacementsChanged = useMemo(() => {
     pendingExitRef.current = null;
     if (!dest) return;
     await handleReset();
-    navigate(dest.path, dest.options);
+    if (typeof dest.path === "number") {
+      navigate(dest.path);
+    } else {
+      navigate(dest.path, dest.options);
+    }
   };
 
-  const handleBack = () => guardedNavigate("/dashboard");
+  const handleBack = () => guardedNavigate(-1);
 
   const handleExit = () => guardedNavigate("/record", { state });
 
@@ -695,7 +701,7 @@ const haveReplacementsChanged = useMemo(() => {
       </Backdrop>
 
       {/* ─── Header ───────────────────────────────────────────── */}
-      <PageHeader title={projectName} onBack={handleBack}>
+      <PageHeader leftIcon="back" onLeftClick={handleBack} title={projectName}>
         <Box
           sx={{
             display: "flex",

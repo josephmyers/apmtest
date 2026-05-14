@@ -33,7 +33,7 @@ export default function LoginPage() {
       const fn = tab === 0 ? login : signup;
       const data = await fn(email, password);
       setAuth(data.token, data.user);
-      navigate("/dashboard");
+      navigate("/");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {

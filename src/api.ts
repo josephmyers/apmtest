@@ -35,12 +35,30 @@ export interface Project {
   sections: Section[];
 }
 
+export interface ProjectSummary {
+  id: number;
+  name: string;
+  teamId: number;
+  sectionCount: number;
+}
+
 interface ProjectListResponse {
-  projects: { id: number; name: string }[];
+  projects: ProjectSummary[];
 }
 
 interface ProjectDetailResponse {
   project: Project;
+}
+
+export interface Team {
+  id: number;
+  name: string;
+}
+
+export interface TeamMember {
+  userId: number;
+  email: string;
+  pending: boolean;
 }
 
 export async function signup(
@@ -80,12 +98,168 @@ export async function getMe(token: string): Promise<MeResponse> {
   return data;
 }
 
-export async function getProjects(token: string): Promise<ProjectListResponse> {
-  const res = await fetch(`${API_BASE}/projects`, {
+export async function getProjects(
+  token: string,
+  teamId: number,
+): Promise<ProjectListResponse> {
+  const res = await fetch(`${API_BASE}/projects?teamId=${teamId}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "Failed to fetch projects");
+  return data;
+}
+
+export async function createProject(
+  token: string,
+  teamId: number,
+  name: string,
+): Promise<{ project: ProjectSummary }> {
+  const res = await fetch(`${API_BASE}/projects`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ teamId, name }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Failed to create project");
+  return data;
+}
+
+export async function deleteProject(
+  token: string,
+  projectId: number,
+): Promise<{ success: boolean }> {
+  const res = await fetch(`${API_BASE}/projects?projectId=${projectId}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Failed to delete project");
+  return data;
+}
+
+export async function renameProject(
+  token: string,
+  projectId: number,
+  name: string,
+): Promise<{ project: { id: number; name: string; teamId: number } }> {
+  const res = await fetch(`${API_BASE}/projects`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ projectId, name }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Failed to rename project");
+  return data;
+}
+
+export async function getTeams(token: string): Promise<{ teams: Team[] }> {
+  const res = await fetch(`${API_BASE}/teams`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Failed to fetch teams");
+  return data;
+}
+
+export async function createTeam(
+  token: string,
+  name: string,
+): Promise<{ team: Team }> {
+  const res = await fetch(`${API_BASE}/teams`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ name }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Failed to create team");
+  return data;
+}
+
+export async function renameTeam(
+  token: string,
+  teamId: number,
+  name: string,
+): Promise<{ team: Team }> {
+  const res = await fetch(`${API_BASE}/teams?id=${teamId}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ name }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Failed to rename team");
+  return data;
+}
+
+export async function deleteTeam(
+  token: string,
+  teamId: number,
+): Promise<{ success: boolean }> {
+  const res = await fetch(`${API_BASE}/teams?id=${teamId}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Failed to delete team");
+  return data;
+}
+
+export async function getTeamMembers(
+  token: string,
+  teamId: number,
+): Promise<{ members: TeamMember[] }> {
+  const res = await fetch(`${API_BASE}/team-members?teamId=${teamId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Failed to fetch team members");
+  return data;
+}
+
+export async function addTeamMember(
+  token: string,
+  teamId: number,
+  email: string,
+): Promise<{ member: TeamMember }> {
+  const res = await fetch(`${API_BASE}/team-members?teamId=${teamId}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ email }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Failed to add team member");
+  return data;
+}
+
+export async function removeTeamMember(
+  token: string,
+  teamId: number,
+  userId: number,
+): Promise<{ success: boolean }> {
+  const res = await fetch(
+    `${API_BASE}/team-members?teamId=${teamId}&userId=${userId}`,
+    {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    },
+  );
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Failed to remove team member");
   return data;
 }
 
