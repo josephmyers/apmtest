@@ -300,7 +300,7 @@ function RecordPageInner() {
     deleteUnversionedReplacements(token, passageId);
     setHasUnversionedReplacements(false);
     setVersionsDialogOpen(false);
-    setSnackMsg("Version activated!");
+    setSnackMsg("Version loaded!");
   }
 
   async function handleDeleteVersion(version: PassageVersion) {
