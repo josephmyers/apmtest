@@ -1,5 +1,5 @@
-import React from "react";
-import { AppBar, Box, IconButton, Toolbar, Typography } from "@mui/material";
+import React, { useState } from "react";
+import { AppBar, Box, IconButton, Menu, MenuItem, Toolbar, Typography } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
@@ -32,6 +32,7 @@ export default function PageHeader({
   children,
 }: PageHeaderProps) {
   const { user, logout } = useAuth();
+  const [accountAnchor, setAccountAnchor] = useState<HTMLElement | null>(null);
 
   return (
     <AppBar
@@ -75,11 +76,18 @@ export default function PageHeader({
         </IconButton>
         <IconButton
           size="small"
-          onClick={logout}
-          title={user?.email ? `Logout ${user.email}` : "Logout"}
+          onClick={(e) => setAccountAnchor(e.currentTarget)}
         >
           <AccountCircleIcon />
         </IconButton>
+        <Menu
+          anchorEl={accountAnchor}
+          open={Boolean(accountAnchor)}
+          onClose={() => setAccountAnchor(null)}
+        >
+          <MenuItem disabled>{user?.email!}</MenuItem>
+          <MenuItem onClick={() => { setAccountAnchor(null); logout(); }}>Log Out</MenuItem>
+        </Menu>
       </Toolbar>
       {children}
     </AppBar>
