@@ -7,11 +7,13 @@ import {
   Card,
   CardActionArea,
   CardContent,
+  Checkbox,
   CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
+  FormControlLabel,
   IconButton,
   ListItemIcon,
   ListItemText,
@@ -25,6 +27,7 @@ import MenuBookIcon from "@mui/icons-material/MenuBook";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
+import SettingsIcon from "@mui/icons-material/Settings";
 import { useAuth } from "./AuthContext";
 import PageHeader from "./PageHeader";
 import TeamMembersDialog from "./TeamMembersDialog";
@@ -33,6 +36,8 @@ import {
   deleteProject,
   getProjects,
   renameProject,
+  updateProjectFlags,
+  type ProjectFlags,
   type ProjectSummary,
 } from "./api";
 
@@ -46,6 +51,7 @@ export default function ProjectsPage() {
   const [membersOpen, setMembersOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [renameTarget, setRenameTarget] = useState<ProjectSummary | null>(null);
+  const [adminTarget, setAdminTarget] = useState<ProjectSummary | null>(null);
 
   const reload = useCallback(async () => {
     if (!token || !activeTeamId) return;
@@ -101,6 +107,20 @@ export default function ProjectsPage() {
     } finally {
       setRenameTarget(null);
       setLoading(false);
+    }
+  };
+
+  const handleFlagsChange = async (projectId: number, flags: ProjectFlags) => {
+    if (!token) return;
+    setProjects((prev) =>
+      prev.map((p) => (p.id === projectId ? { ...p, flags } : p)),
+    );
+    setAdminTarget((prev) => (prev && prev.id === projectId ? { ...prev, flags } : prev));
+    try {
+      await updateProjectFlags(token, projectId, flags);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update project");
+      await reload();
     }
   };
 
@@ -161,6 +181,7 @@ export default function ProjectsPage() {
                 onOpen={() => navigate(`/projects/${p.id}`)}
                 onDelete={() => handleDelete(p.id)}
                 onRename={() => setRenameTarget(p)}
+                onAdmin={() => setAdminTarget(p)}
               />
             ))}
           </Box>
@@ -204,6 +225,12 @@ export default function ProjectsPage() {
           onConfirm={(name) => handleRename(renameTarget.id, name)}
         />
       )}
+
+      <ProjectAdminDialog
+        project={adminTarget}
+        onClose={() => setAdminTarget(null)}
+        onFlagsChange={handleFlagsChange}
+      />
     </Box>
   );
 }
@@ -213,11 +240,13 @@ function ProjectCard({
   onOpen,
   onDelete,
   onRename,
+  onAdmin,
 }: {
   project: ProjectSummary;
   onOpen: () => void;
   onDelete: () => void;
   onRename: () => void;
+  onAdmin: () => void;
 }) {
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
 
@@ -274,6 +303,17 @@ function ProjectCard({
         <MenuItem
           onClick={() => {
             setMenuAnchor(null);
+            onAdmin();
+          }}
+        >
+          <ListItemIcon>
+            <SettingsIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Admin</ListItemText>
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            setMenuAnchor(null);
             onDelete();
           }}
         >
@@ -284,6 +324,49 @@ function ProjectCard({
         </MenuItem>
       </Menu>
     </Card>
+  );
+}
+
+function ProjectAdminDialog({
+  project,
+  onClose,
+  onFlagsChange,
+}: {
+  project: ProjectSummary | null;
+  onClose: () => void;
+  onFlagsChange: (projectId: number, flags: ProjectFlags) => Promise<void>;
+}) {
+  const structureEditsAllowed = project?.flags?.structureEditsAllowed !== false;
+
+  return (
+    <Dialog
+      open={Boolean(project)}
+      onClose={onClose}
+      fullWidth
+      maxWidth="xs"
+    >
+      <DialogTitle>{project ? `${project.name} — Admin` : "Admin"}</DialogTitle>
+      <DialogContent>
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={structureEditsAllowed}
+              onChange={(e) => {
+                if (!project) return;
+                onFlagsChange(project.id, {
+                  ...project.flags,
+                  structureEditsAllowed: e.target.checked,
+                });
+              }}
+            />
+          }
+          label="Structure Edits Allowed"
+        />
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Close</Button>
+      </DialogActions>
+    </Dialog>
   );
 }
 

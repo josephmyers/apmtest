@@ -29,9 +29,14 @@ export interface Section {
   passages: Passage[];
 }
 
+export interface ProjectFlags {
+  structureEditsAllowed?: boolean;
+}
+
 export interface Project {
   id: number;
   name: string;
+  flags: ProjectFlags;
   sections: Section[];
 }
 
@@ -39,6 +44,7 @@ export interface ProjectSummary {
   id: number;
   name: string;
   teamId: number;
+  flags: ProjectFlags;
   sectionCount: number;
 }
 
@@ -145,7 +151,7 @@ export async function renameProject(
   token: string,
   projectId: number,
   name: string,
-): Promise<{ project: { id: number; name: string; teamId: number } }> {
+): Promise<{ project: { id: number; name: string; teamId: number; flags: ProjectFlags } }> {
   const res = await fetch(`${API_BASE}/projects`, {
     method: "PATCH",
     headers: {
@@ -156,6 +162,24 @@ export async function renameProject(
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "Failed to rename project");
+  return data;
+}
+
+export async function updateProjectFlags(
+  token: string,
+  projectId: number,
+  flags: ProjectFlags,
+): Promise<{ project: { id: number; name: string; teamId: number; flags: ProjectFlags } }> {
+  const res = await fetch(`${API_BASE}/projects`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ projectId, flags }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Failed to update project flags");
   return data;
 }
 

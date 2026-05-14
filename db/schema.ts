@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { boolean, doublePrecision, integer, pgTable, varchar, text, timestamp, serial } from 'drizzle-orm/pg-core';
+import { boolean, doublePrecision, integer, jsonb, pgTable, varchar, text, timestamp, serial } from 'drizzle-orm/pg-core';
 
 export const teams = pgTable('teams', {
     id: serial('id').primaryKey(),
@@ -19,6 +19,7 @@ export const projects = pgTable('projects', {
     id: serial('id').primaryKey(),
     teamId: integer('team_id').notNull().references(() => teams.id, { onDelete: 'cascade' }),
     name: varchar('name', { length: 255 }).notNull(),
+    flags: jsonb('flags').notNull().default(sql`'{}'::jsonb`),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 });
 

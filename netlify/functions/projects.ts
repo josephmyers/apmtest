@@ -25,7 +25,7 @@ export default handle(async (req: Request) => {
     await assertTeamMember(sql, user.userId, teamId);
 
     const projects = await sql`
-      SELECT p.id, p.name, p.team_id, COUNT(s.id)::int AS section_count
+      SELECT p.id, p.name, p.team_id, p.flags, COUNT(s.id)::int AS section_count
       FROM projects p
       LEFT JOIN sections s ON s.project_id = p.id
       WHERE p.team_id = ${teamId}
@@ -37,6 +37,7 @@ export default handle(async (req: Request) => {
         id: p.id,
         name: p.name,
         teamId: p.team_id,
+        flags: p.flags,
         sectionCount: p.section_count,
       })),
     });
@@ -88,7 +89,7 @@ export default handle(async (req: Request) => {
       const [project] = await sql`
         INSERT INTO projects (team_id, name)
         VALUES (${teamId}, ${name})
-        RETURNING id, name, team_id
+        RETURNING id, name, team_id, flags
       `;
       return jsonRes(
         {
@@ -96,6 +97,7 @@ export default handle(async (req: Request) => {
             id: project.id,
             name: project.name,
             teamId: project.team_id,
+            flags: project.flags,
             sectionCount: 0,
           },
         },
@@ -203,20 +205,43 @@ export default handle(async (req: Request) => {
     }
 
     if (body.projectId != null) {
-      const { projectId, name } = body as { projectId: number; name: string };
-      if (!projectId || typeof name !== "string" || !name.trim()) {
-        throw new HttpError(400, "projectId and name are required");
-      }
+      const projectId = Number(body.projectId);
+      if (!projectId) throw new HttpError(400, "projectId is required");
       await assertProjectAccess(sql, user.userId, projectId);
+
+      if (body.flags !== undefined) {
+        if (typeof body.flags !== "object" || body.flags === null || Array.isArray(body.flags)) {
+          throw new HttpError(400, "flags must be an object");
+        }
+        const flagsJson = JSON.stringify(body.flags);
+        const result = await sql`
+          UPDATE projects SET flags = ${flagsJson}::jsonb WHERE id = ${projectId}
+          RETURNING id, name, team_id, flags
+        `;
+        return jsonRes({
+          project: {
+            id: result[0].id,
+            name: result[0].name,
+            teamId: result[0].team_id,
+            flags: result[0].flags,
+          },
+        });
+      }
+
+      const name = body.name;
+      if (typeof name !== "string" || !name.trim()) {
+        throw new HttpError(400, "name or flags is required");
+      }
       const result = await sql`
         UPDATE projects SET name = ${name.trim()} WHERE id = ${projectId}
-        RETURNING id, name, team_id
+        RETURNING id, name, team_id, flags
       `;
       return jsonRes({
         project: {
           id: result[0].id,
           name: result[0].name,
           teamId: result[0].team_id,
+          flags: result[0].flags,
         },
       });
     }

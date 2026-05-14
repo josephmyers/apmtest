@@ -330,40 +330,42 @@ function ProjectOverviewTab({
       )}
 
       {/* Action buttons */}
-      <Box
-        sx={{
-          display: "flex",
-          alignItems: "center",
-          gap: 1,
-          px: 1,
-          py: 1.5,
-          bgcolor: "#eee",
-          borderBottom: 1,
-          borderColor: "divider",
-          position: "sticky",
-          top: 0,
-          zIndex: 1,
-          overflowX: "auto",
-          whiteSpace: "nowrap",
-          "&::-webkit-scrollbar": { height: 7 },
-          "&::-webkit-scrollbar-thumb": { bgcolor: "#ccc", borderRadius: 4 },
-        }}
-      >
-        <Button
-          onClick={handleAddSection}
-          disabled={addPassageMode}
-          sx={{ width: 132, flex: "0 0 auto" }}
+      {project.flags?.structureEditsAllowed !== false && (
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+            px: 1,
+            py: 1.5,
+            bgcolor: "#eee",
+            borderBottom: 1,
+            borderColor: "divider",
+            position: "sticky",
+            top: 0,
+            zIndex: 1,
+            overflowX: "auto",
+            whiteSpace: "nowrap",
+            "&::-webkit-scrollbar": { height: 7 },
+            "&::-webkit-scrollbar-thumb": { bgcolor: "#ccc", borderRadius: 4 },
+          }}
         >
-          Add Section
-        </Button>
-        <Button
-          variant={addPassageMode ? "primary" : undefined}
-          onClick={() => setAddPassageMode((prev) => !prev)}
-          sx={{ width: 132, flex: "0 0 auto" }}
-        >
-          Add Passage
-        </Button>
-      </Box>
+          <Button
+            onClick={handleAddSection}
+            disabled={addPassageMode}
+            sx={{ width: 132, flex: "0 0 auto" }}
+          >
+            Add Section
+          </Button>
+          <Button
+            variant={addPassageMode ? "primary" : undefined}
+            onClick={() => setAddPassageMode((prev) => !prev)}
+            sx={{ width: 132, flex: "0 0 auto" }}
+          >
+            Add Passage
+          </Button>
+        </Box>
+      )}
 
 
       {/* Sections */}

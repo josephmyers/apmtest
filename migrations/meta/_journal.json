@@ -15,6 +15,13 @@
       "when": 1778706442776,
       "tag": "0001_flat_reavers",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1778766809368,
+      "tag": "0002_panoramic_the_fury",
+      "breakpoints": true
     }
   ]
 }
