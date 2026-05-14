@@ -247,9 +247,6 @@ function ProjectOverviewTab({
   addPassageMode: boolean;
   setAddPassageMode: React.Dispatch<React.SetStateAction<boolean>>;
 }) {
-  const theme = useTheme();
-  const isSmallScreen = useMediaQuery(theme.breakpoints.down("md"));
-
   const handleAddSection = async () => {
     if (!project || !token) return;
     const nextNumber = project.sections.length + 1;
@@ -333,45 +330,40 @@ function ProjectOverviewTab({
       )}
 
       {/* Action buttons */}
-      {!isSmallScreen && (
-        <Box
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            gap: 1,
-            px: 1,
-            py: 1.5,
-            bgcolor: "#eee",
-            borderBottom: 1,
-            borderColor: "divider",
-            position: "sticky",
-            top: 0,
-            zIndex: 1,
-            overflowX: "auto",
-            whiteSpace: "nowrap",
-            "&::-webkit-scrollbar": { height: 7 },
-            "&::-webkit-scrollbar-thumb": { bgcolor: "#ccc", borderRadius: 4 },
-          }}
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          gap: 1,
+          px: 1,
+          py: 1.5,
+          bgcolor: "#eee",
+          borderBottom: 1,
+          borderColor: "divider",
+          position: "sticky",
+          top: 0,
+          zIndex: 1,
+          overflowX: "auto",
+          whiteSpace: "nowrap",
+          "&::-webkit-scrollbar": { height: 7 },
+          "&::-webkit-scrollbar-thumb": { bgcolor: "#ccc", borderRadius: 4 },
+        }}
+      >
+        <Button
+          onClick={handleAddSection}
+          disabled={addPassageMode}
+          sx={{ width: 132, flex: "0 0 auto" }}
         >
-          <Button
-            onClick={handleAddSection}
-            disabled={addPassageMode}
-            sx={{ width: 132, flex: "0 0 auto" }}
-          >
-            Add Section
-          </Button>
-          <Button
-            variant={addPassageMode ? "primary" : undefined}
-            onClick={() => setAddPassageMode((prev) => !prev)}
-            sx={{ width: 132, flex: "0 0 auto" }}
-          >
-            Add Passage
-          </Button>
-          <Button disabled={addPassageMode} sx={{ width: 132, flex: "0 0 auto" }}>
-            Spreadsheet
-          </Button>
-        </Box>
-      )}
+          Add Section
+        </Button>
+        <Button
+          variant={addPassageMode ? "primary" : undefined}
+          onClick={() => setAddPassageMode((prev) => !prev)}
+          sx={{ width: 132, flex: "0 0 auto" }}
+        >
+          Add Passage
+        </Button>
+      </Box>
 
 
       {/* Sections */}
