@@ -518,6 +518,7 @@ const haveReplacementsChanged = useMemo(() => {
   const [confirmRenderOpen, setConfirmRenderOpen] = useState(false);
   const [confirmExitOpen, setConfirmExitOpen] = useState(false); // I'm pretty sure we still need this
   const [confirmDiscardExitOpen, setConfirmDiscardExitOpen] = useState(false);
+  const [confirmResetOpen, setConfirmResetOpen] = useState(false);
 
   const handleRenderClick = () => {
     if (hasUnversionedRendering) {
@@ -784,7 +785,7 @@ const haveReplacementsChanged = useMemo(() => {
             </IconButton>
           )}
           {haveReplacementsChanged ? (
-            <Button onClick={handleReset}>Reset</Button>
+            <Button onClick={() => setConfirmResetOpen(true)}>Reset</Button>
           ) : (
             renderedBlob && (
               <FormControlLabel
@@ -936,6 +937,21 @@ const haveReplacementsChanged = useMemo(() => {
           </Button>
         )}
       </Box>
+
+      {/* ─── Confirm Reset Dialog ─────────────────────────── */}
+      <Dialog open={confirmResetOpen} onClose={() => setConfirmResetOpen(false)}>
+        <DialogContent>
+          <DialogContentText>
+            {renderedBlob
+              ? "Reset will discard your changes and restore the replacements to the last rendering."
+              : "Reset will discard your changes and reset to when this page loaded."}
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmResetOpen(false)} variant="primary">Cancel</Button>
+          <Button onClick={() => { setConfirmResetOpen(false); handleReset(); }}>Reset</Button>
+        </DialogActions>
+      </Dialog>
 
       {/* ─── Confirm Re-render Dialog ─────────────────────── */}
       <Dialog open={confirmRenderOpen} onClose={() => setConfirmRenderOpen(false)}>
