@@ -212,6 +212,10 @@ const haveReplacementsChanged = useMemo(() => {
       setRenderedBlob(renderedBlob);
       setHasUnversionedRendering(!!unversionedBlob);
 
+      if (!!renderedBlob) {
+        setShowRendered(true);
+      }
+
       if (unversionedReplacements.length > 0) {
         setReplacements(unversionedReplacements);
         setActiveReplacements(unversionedReplacements);
