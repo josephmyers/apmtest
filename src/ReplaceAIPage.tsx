@@ -85,6 +85,15 @@ interface OffsetEntry {
   offset: number;
 }
 
+const sameReplacementContent = (a: Replacement, b: Replacement) =>
+  a.title === b.title &&
+  a.note === b.note &&
+  a.name === b.name &&
+  a.selection.start === b.selection.start &&
+  a.selection.end === b.selection.end &&
+  a.original === b.original &&
+  a.audio === b.audio;
+
 /** Map a time in composed-audio space back to original-passage time. */
 function composedToOriginalTime(t: number, offsetMap: OffsetEntry[]): number {
   let prevOffset = 0;
@@ -164,15 +173,7 @@ export default function ReplaceAIPage() {
 const haveReplacementsChanged = useMemo(() => {
   if (replacements.length !== activeReplacements.length) return true;
   return replacements.some(r =>
-    !activeReplacements.find(s =>
-      r.title === s.title &&
-      r.note === s.note &&
-      r.name === s.name &&
-      r.selection.start === s.selection.start &&
-      r.selection.end === s.selection.end &&
-      r.original === s.original &&
-      r.audio === s.audio
-    )
+    !activeReplacements.find(s => sameReplacementContent(r, s))
   );
 }, [renderedBlob, replacements, activeReplacements]);
 
@@ -496,6 +497,9 @@ const haveReplacementsChanged = useMemo(() => {
             e.before.id === oldId ? { ...e, before: { ...e.before, id: newId } } : e,
           ),
         );
+        setActiveReplacements((prev) =>
+          prev.map((s) => (s.id === oldId ? { ...s, id: newId } : s)),
+        );
         setReplacements((prev) => [...prev, { ...entry.before, id: newId }]);
       }
 
@@ -812,8 +816,10 @@ const haveReplacementsChanged = useMemo(() => {
 
         {/* Replacement rows + Add Replacement row in chronological order */}
         {!showRendered &&
-          replacementRows.map((row) =>
-            row.type === "add" ? (
+          replacementRows.map((row) => {
+            // Added
+            if (row.type === "add") {
+              return (
               <Stack
                 key="add-replacement"
                 direction="row"
@@ -837,50 +843,63 @@ const haveReplacementsChanged = useMemo(() => {
                   </Button>
                 </Box>
               </Stack>
-            ) : (
+              );
+            }
+
+            // Edited
+            const r = row.replacement;
+            const baseReplacement = activeReplacements.find((s) => s.id === r.id);
+            const isEdited =
+              !!renderedBlob && !!baseReplacement && !sameReplacementContent(r, baseReplacement);
+            return (
               <Stack
-                key={row.replacement.id}
+                key={r.id}
                 direction="row"
                 alignItems="center"
                 spacing={2}
                 sx={{ mt: 1 }}
               >
                 <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                  {row.replacement.title}
+                  {r.title}
                 </Typography>
                 <Typography variant="body2">
                   {formatTime(
                     originalToComposedTime(
-                      row.replacement.selection.start,
+                      r.selection.start,
                       offsetMapRef.current,
                     ),
                   )}{" "}
                   -{" "}
                   {formatTime(
                     originalToComposedTime(
-                      row.replacement.selection.end,
+                      r.selection.end,
                       offsetMapRef.current,
                     ),
                   )}
                 </Typography>
+                {isEdited && (
+                  <Typography variant="body2" color="text.secondary">
+                    (Changed)
+                  </Typography>
+                )}
                 <Box sx={{ flex: 1 }} />
                 <IconButton
                   size="small"
-                  onClick={() => handleEditClick(row.replacement)}
+                  onClick={() => handleEditClick(r)}
                   disabled={saving}
                 >
                   <EditIcon fontSize="small" />
                 </IconButton>
                 <IconButton
                   size="small"
-                  onClick={() => handleDeleteReplacement(row.replacement.id)}
+                  onClick={() => handleDeleteReplacement(r.id)}
                   disabled={saving}
                 >
                   <DeleteOutlineIcon fontSize="small" />
                 </IconButton>
               </Stack>
-            ),
-          )}
+            );
+          })}
 
         {/* Helper text — absolutely positioned so it doesn't shift when rows appear above */}
         <Box
