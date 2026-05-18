@@ -746,7 +746,7 @@ const haveReplacementsChanged = useMemo(() => {
           >
             <MenuItem onClick={handleDiscardAndExit}>
               <HideSourceIcon fontSize="small" sx={{ mr: 1 }} />
-              Discard and Exit
+              Reset and Exit
             </MenuItem>
           </Menu>
         </Box>
@@ -980,7 +980,7 @@ const haveReplacementsChanged = useMemo(() => {
         </DialogActions>
       </Dialog>
 
-      {/* ─── Confirm Discard And Exit Dialog ──────────────── */}
+      {/* ─── Confirm Reset And Exit Dialog ──────────────── */}
       <Dialog
         open={confirmDiscardExitOpen}
         onClose={() => setConfirmDiscardExitOpen(false)}
