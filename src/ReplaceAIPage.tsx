@@ -649,7 +649,7 @@ const haveReplacementsChanged = useMemo(() => {
   const previousRecordings = useMemo(
     () => [
       ...preservedReplacements.filter(
-        preserved => !replacements.some(r => r.title === preserved.title && r.note === preserved.note)),
+        preserved => !replacements.some(r => r.original && r.title === preserved.title && r.note === preserved.note)),
       ...replacements
         .filter((r) => r.original)
         .map((r) => ({ id: r.id, title: r.title, note: r.note, name: r.name, audio: r.audio })),
