@@ -271,7 +271,9 @@ export default function VersionsDialog({
                         sx={{
                           display: "block",
                           color: "text.secondary",
-                          height: "20px"
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap"
                         }}
                       >
                         {version.note}
