@@ -4,6 +4,7 @@ import {
   Backdrop,
   Box,
   Button,
+  Checkbox,
   CircularProgress,
   Dialog,
   DialogActions,
@@ -33,6 +34,7 @@ import {
   createPassageVersion,
   deleteUnversionedReplacements,
   discardUnversionedRendering,
+  getPreservedReplacements,
   fetchAudio,
   fetchVersionAudio,
   fetchUnversionedRendering,
@@ -191,7 +193,9 @@ const haveReplacementsChanged = useMemo(() => {
     Promise.all([
       getReplacements(token, passageId, null),
       listPassageVersions(token, passageId),
-    ]).then(async ([unversionedReplacements, { versions }]) => {
+      getPreservedReplacements(token, passageId),
+    ]).then(async ([unversionedReplacements, { versions }, preserved]) => {
+      setPreservedReplacements(preserved);
       const { passage } = await getPassage(token, passageId);
       const activeVersion = versions.find((v) => v.audioKey === passage.audioKey)!;
 
@@ -515,6 +519,11 @@ const haveReplacementsChanged = useMemo(() => {
     );
   };
 
+  const [keepReplacements, setKeepReplacements] = useState(true);
+  const [preservedReplacements, setPreservedReplacements] = useState<
+    { id: number; title: string; note: string; name: string; audio: Blob }[]
+  >([]);
+
   const [confirmRenderOpen, setConfirmRenderOpen] = useState(false);
   const [confirmExitOpen, setConfirmExitOpen] = useState(false); // I'm pretty sure we still need this
   const [confirmDiscardExitOpen, setConfirmDiscardExitOpen] = useState(false);
@@ -586,7 +595,7 @@ const haveReplacementsChanged = useMemo(() => {
     setConfirmDiscardExitOpen(false);
     setIsBusy(true);
     try {
-      await deleteUnversionedReplacements(token!, passageId);
+      await deleteUnversionedReplacements(token!, passageId, keepReplacements);
       await discardUnversionedRendering(token!, passageId);
       navigate("/record", { state });
     } finally {
@@ -632,17 +641,14 @@ const haveReplacementsChanged = useMemo(() => {
   };
 
   const previousRecordings = useMemo(
-    () =>
-      replacements
+    () => [
+      ...preservedReplacements.filter(
+        preserved => !replacements.some(r => r.title === preserved.title && r.note === preserved.note)),
+      ...replacements
         .filter((r) => r.original)
-        .map((r) => ({
-          id: r.id,
-          title: r.title,
-          note: r.note,
-          name: r.name,
-          audio: r.audio,
-        })),
-    [replacements],
+        .map((r) => ({ id: r.id, title: r.title, note: r.note, name: r.name, audio: r.audio })),
+    ],
+    [preservedReplacements, replacements],
   );
 
   type ReplacementRow =
@@ -983,17 +989,27 @@ const haveReplacementsChanged = useMemo(() => {
       {/* ─── Confirm Reset And Exit Dialog ──────────────── */}
       <Dialog
         open={confirmDiscardExitOpen}
-        onClose={() => setConfirmDiscardExitOpen(false)}
+        onClose={() => { setConfirmDiscardExitOpen(false); setKeepReplacements(true); }}
       >
         <DialogContent>
           <DialogContentText>
             All your progress will be permanently deleted. Replacement markings
             and rendered audio not selected for "Use This Version" will be removed.
           </DialogContentText>
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={keepReplacements}
+                onChange={(_, checked) => setKeepReplacements(checked)}
+              />
+            }
+            label="Keep replacement recordings"
+            sx={{ mt: 1 }}
+          />
         </DialogContent>
         <DialogActions>
           <Button
-            onClick={() => setConfirmDiscardExitOpen(false)}
+            onClick={() => { setConfirmDiscardExitOpen(false); setKeepReplacements(true); }}
             variant="primary"
             disabled={isBusy}
           >

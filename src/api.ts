@@ -570,8 +570,11 @@ export async function deleteReplacement(
 export async function deleteUnversionedReplacements(
   token: string,
   passageId: number,
+  keepOriginals?: boolean,
 ): Promise<{ success: boolean }> {
-  const res = await fetch(`${API_BASE}/replacements?passageId=${passageId}`, {
+  const params = new URLSearchParams({ passageId: String(passageId) });
+  if (keepOriginals) params.set("keepOriginals", "1");
+  const res = await fetch(`${API_BASE}/replacements?${params}`, {
     method: "DELETE",
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -579,6 +582,24 @@ export async function deleteUnversionedReplacements(
   if (!res.ok)
     throw new Error(data.error || "Failed to delete unversioned replacements");
   return data;
+}
+
+export async function getPreservedReplacements(
+  token: string,
+  passageId: number,
+): Promise<{ id: number; title: string; note: string; name: string; audio: Blob }[]> {
+  const res = await fetch(
+    `${API_BASE}/replacements?passageId=${passageId}&preserved=1`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  const data = await res.json() as { replacements: { id: number; title: string; note: string; name: string }[] };
+  if (!res.ok) throw new Error("Failed to fetch preserved replacements");
+  return Promise.all(
+    data.replacements.map(async (rd) => {
+      const audio = await fetchReplacementAudio(token, rd.id);
+      return { ...rd, audio: audio! };
+    }),
+  );
 }
 
 export async function updateReplacement(

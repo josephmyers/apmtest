@@ -22,6 +22,13 @@
       "when": 1778766809368,
       "tag": "0002_panoramic_the_fury",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1779128667759,
+      "tag": "0003_fixed_rage",
+      "breakpoints": true
     }
   ]
 }

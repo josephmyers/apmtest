@@ -121,10 +121,29 @@ export default handle(async (req: Request) => {
   // GET /replacements?passageId=1[&versionId=5|null]
   // versionId=null filters to unversioned (NULL) replacements only
   // No versionId param returns all replacements for the passage
+  // preserved=1 returns unversioned rows with null selection (preserved originals)
   if (method === "GET") {
     const passageId = Number(url.searchParams.get("passageId"));
     if (!passageId) throw new HttpError(400, "passageId is required");
     await assertPassageAccess(sql, user.userId, passageId);
+
+    if (url.searchParams.get("preserved") === "1") {
+      const rows = await sql`
+        SELECT id, title, note, name
+        FROM replacements
+        WHERE passage_id = ${passageId} AND version_id IS NULL
+          AND selection_start IS NULL AND selection_end IS NULL
+        ORDER BY created_at
+      `;
+      return jsonRes({
+        replacements: rows.map((r: Record<string, unknown>) => ({
+          id: r.id,
+          title: r.title,
+          note: r.note,
+          name: r.name,
+        })),
+      });
+    }
 
     const versionIdParam = url.searchParams.get("versionId");
     let rows;
@@ -133,6 +152,7 @@ export default handle(async (req: Request) => {
         SELECT id, title, note, name, selection_start, selection_end, original, version_id
         FROM replacements
         WHERE passage_id = ${passageId} AND version_id IS NULL
+          AND (selection_start IS NOT NULL OR selection_end IS NOT NULL)
         ORDER BY created_at
       `;
     } else if (versionIdParam !== null) {
@@ -140,6 +160,7 @@ export default handle(async (req: Request) => {
         SELECT id, title, note, name, selection_start, selection_end, original, version_id
         FROM replacements
         WHERE passage_id = ${passageId} AND version_id = ${Number(versionIdParam)}
+          AND (selection_start IS NOT NULL OR selection_end IS NOT NULL)
         ORDER BY created_at
       `;
     } else {
@@ -147,6 +168,7 @@ export default handle(async (req: Request) => {
         SELECT id, title, note, name, selection_start, selection_end, original, version_id
         FROM replacements
         WHERE passage_id = ${passageId}
+          AND (selection_start IS NOT NULL OR selection_end IS NOT NULL)
         ORDER BY created_at
       `;
     }
@@ -229,6 +251,37 @@ export default handle(async (req: Request) => {
 
     if (passageId) {
       await assertPassageAccess(sql, user.userId, passageId);
+
+      if (url.searchParams.get("keepOriginals") === "1") {
+        const rows = await sql`
+          SELECT id, audio_key, original, title, note FROM replacements
+          WHERE passage_id = ${passageId} AND version_id IS NULL
+          ORDER BY id
+        `;
+        const seen = new Set<string>();
+        const toDelete: typeof rows = [];
+        for (const r of rows) {
+          if (!r.original) {
+            toDelete.push(r); // delete original==false
+          } else {
+            const key = `${r.title}\0${r.note}`; // delete duplicate title+note
+            if (seen.has(key)) toDelete.push(r);
+            else seen.add(key);
+          }
+        }
+        await Promise.all(
+          toDelete.filter((r) => r.audio_key).map((r) => store.delete(r.audio_key as string)),
+        );
+        for (const r of toDelete) {
+          await sql`DELETE FROM replacements WHERE id = ${r.id}`;
+        }
+        await sql`
+          UPDATE replacements SET selection_start = NULL, selection_end = NULL
+          WHERE passage_id = ${passageId} AND version_id IS NULL AND original = true
+        `;
+        return jsonRes({ success: true });
+      }
+
       const rows = await sql`
         SELECT audio_key FROM replacements
         WHERE passage_id = ${passageId} AND version_id IS NULL
