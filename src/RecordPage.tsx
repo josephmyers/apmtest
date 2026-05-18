@@ -48,6 +48,7 @@ interface RecordPageState {
   passageId: number;
   passageReference: string;
   projectName: string;
+  projectId?: number;
   speaker?: string | null;
   sectionPassages?: { id: number; reference: string; speaker: string | null }[];
 }
@@ -89,6 +90,7 @@ function RecordPageInner() {
     state.passageId || (Number.isFinite(passageIdFromQuery) ? passageIdFromQuery : 0);
   const passageReference = state.passageReference ?? "Unknown Passage";
   const projectName = state.projectName ?? "";
+  const projectId = state.projectId;
   const sectionPassages = state.sectionPassages ?? [];
 
   // Audio state
@@ -334,7 +336,7 @@ function RecordPageInner() {
       {/* ─── Header ───────────────────────────────────────────────── */}
       <PageHeader
         leftIcon="back"
-        onLeftClick={() => navigate(-1)}
+        onLeftClick={() => navigate(projectId ? `/projects/${projectId}` : "/projects")}
         title={projectName}
       >
         {/* Racetrack row */}

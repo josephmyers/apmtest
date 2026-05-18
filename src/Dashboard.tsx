@@ -389,6 +389,7 @@ function ProjectOverviewTab({
               addPassageMode={addPassageMode}
               onInsertPassage={handleAddPassage}
               projectName={project?.name ?? ""}
+              projectId={project.id}
               structureEditsAllowed={
                 project.flags?.structureEditsAllowed !== false
               }
@@ -410,6 +411,7 @@ function SectionRow({
   addPassageMode,
   onInsertPassage,
   projectName,
+  projectId,
   structureEditsAllowed,
 }: {
   section: Section;
@@ -419,6 +421,7 @@ function SectionRow({
   addPassageMode: boolean;
   onInsertPassage: (sectionId: number, sortOrder: number) => Promise<void>;
   projectName: string;
+  projectId: number;
   structureEditsAllowed: boolean;
 }) {
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
@@ -537,6 +540,7 @@ function SectionRow({
                   setLoading={setLoading}
                   onDataChanged={onDataChanged}
                   projectName={projectName}
+                  projectId={projectId}
                   structureEditsAllowed={structureEditsAllowed}
                 />
                 {/* Trailing + slot after each card */}
@@ -594,6 +598,7 @@ function PassageCard({
   setLoading,
   onDataChanged,
   projectName,
+  projectId,
   structureEditsAllowed,
 }: {
   passage: Passage;
@@ -603,6 +608,7 @@ function PassageCard({
   setLoading: React.Dispatch<React.SetStateAction<boolean>>;
   onDataChanged: () => Promise<void>;
   projectName: string;
+  projectId: number;
   structureEditsAllowed: boolean;
 }) {
   const navigate = useNavigate();
@@ -766,6 +772,7 @@ function PassageCard({
                 passageId: passage.id,
                 passageReference: passage.reference,
                 projectName,
+                projectId,
                 speaker: passage.speaker,
                 sectionPassages: section.passages.map((p) => ({
                   id: p.id,

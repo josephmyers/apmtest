@@ -289,8 +289,6 @@ const haveReplacementsChanged = useMemo(() => {
     }
   };
 
-  const handleBack = () => guardedNavigate(-1);
-
   const handleExit = () => guardedNavigate("/record", { state });
 
   // Guard browser refresh / tab close
@@ -705,7 +703,7 @@ const haveReplacementsChanged = useMemo(() => {
       </Backdrop>
 
       {/* ─── Header ───────────────────────────────────────────── */}
-      <PageHeader leftIcon="back" onLeftClick={handleBack} title={projectName}>
+      <PageHeader leftIcon="back" onLeftClick={handleExit} title={projectName}>
         <Box
           sx={{
             display: "flex",
