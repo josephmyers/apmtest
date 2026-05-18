@@ -261,6 +261,7 @@ function RecordPageInner() {
   }
 
   async function handleRecordingComplete(blob: Blob) {
+    if (!token) return;
     // Compress and upload
     try {
       setCompressing(true);
@@ -284,6 +285,8 @@ function RecordPageInner() {
       setPassageAudio({ blob: mp3Blob, version });
       setVersions((prev) => [version, ...prev.filter((v) => v.id !== version.id)]);
       setRenderSource(null);
+      deleteUnversionedReplacements(token, passageId);
+      setHasUnversionedReplacements(false);
       setSnackMsg("Audio saved!");
     } catch (err) {
       setSnackMsg(err instanceof Error ? err.message : "Failed to process audio");
