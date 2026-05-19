@@ -152,7 +152,7 @@ export default handle(async (req: Request) => {
         SELECT id, title, note, name, selection_start, selection_end, original, version_id
         FROM replacements
         WHERE passage_id = ${passageId} AND version_id IS NULL
-          AND (selection_start IS NOT NULL OR selection_end IS NOT NULL)
+          AND (selection_start IS NOT NULL AND selection_end IS NOT NULL)
         ORDER BY created_at
       `;
     } else if (versionIdParam !== null) {
@@ -160,7 +160,7 @@ export default handle(async (req: Request) => {
         SELECT id, title, note, name, selection_start, selection_end, original, version_id
         FROM replacements
         WHERE passage_id = ${passageId} AND version_id = ${Number(versionIdParam)}
-          AND (selection_start IS NOT NULL OR selection_end IS NOT NULL)
+          AND (selection_start IS NOT NULL AND selection_end IS NOT NULL)
         ORDER BY created_at
       `;
     } else {
@@ -168,7 +168,7 @@ export default handle(async (req: Request) => {
         SELECT id, title, note, name, selection_start, selection_end, original, version_id
         FROM replacements
         WHERE passage_id = ${passageId}
-          AND (selection_start IS NOT NULL OR selection_end IS NOT NULL)
+          AND (selection_start IS NOT NULL AND selection_end IS NOT NULL)
         ORDER BY created_at
       `;
     }
@@ -308,6 +308,7 @@ export default handle(async (req: Request) => {
     await sql`
       UPDATE replacements SET version_id = ${versionId}
       WHERE passage_id = ${passageId} AND version_id IS NULL
+        AND (selection_start IS NOT NULL AND selection_end IS NOT NULL)
     `;
     return jsonRes({ success: true });
   }

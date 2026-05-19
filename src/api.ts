@@ -570,7 +570,7 @@ export async function deleteReplacement(
 export async function deleteUnversionedReplacements(
   token: string,
   passageId: number,
-  keepOriginals?: boolean,
+  keepOriginals: boolean = true,
 ): Promise<{ success: boolean }> {
   const params = new URLSearchParams({ passageId: String(passageId) });
   if (keepOriginals) params.set("keepOriginals", "1");
