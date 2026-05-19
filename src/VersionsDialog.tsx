@@ -10,6 +10,7 @@ import {
   DialogContent,
   DialogTitle,
   IconButton,
+  Link,
   Radio,
   Typography,
   useMediaQuery,
@@ -38,6 +39,8 @@ interface VersionsDialogProps {
   onMessage: (message: string) => void;
   onUseVersion: (data: UseVersionResult) => void;
   onDeleteVersion: (version: PassageVersion) => Promise<void>;
+  hasUnversionedRendering: boolean;
+  onGoToReplaceAI: () => void;
 }
 
 export default function VersionsDialog({
@@ -51,6 +54,8 @@ export default function VersionsDialog({
   onMessage,
   onUseVersion,
   onDeleteVersion,
+  hasUnversionedRendering,
+  onGoToReplaceAI,
 }: VersionsDialogProps) {
   const [selectedAudioKey, setSelectedAudioKey] = useState<string>(activeAudioKey);
   const [previewPlayingVersionId, setPreviewPlayingVersionId] = useState<number | null>(null);
@@ -82,6 +87,11 @@ export default function VersionsDialog({
     setIsBusy(true);
     try {
       stop();
+      if (selectedAudioKey === activeAudioKey) {
+        handleDialogClose();
+        return;
+      }
+
       await activateVersion(token, selectedVersion.id);
 
       const blob = await fetchVersionAudio(token, selectedVersion.id);
@@ -341,6 +351,30 @@ export default function VersionsDialog({
           })}
         </Box>
       </DialogContent>
+      {hasUnversionedRendering && selectedAudioKey !== activeAudioKey && (
+        <Box sx={{ px: 3, pb: 1, pt: 2 }}>
+          <Typography
+            variant="body2"
+            sx={{ color: "error.main", fontWeight: 600 }}
+          >
+            You have an unsaved AI rendering that will be lost if you
+            switch to a different version.{" "}
+            <Link
+              component="button"
+              type="button"
+              onClick={onGoToReplaceAI}
+              sx={{
+                color: "error.main",
+                fontWeight: 600,
+                verticalAlign: "baseline",
+              }}
+            >
+              Click here
+            </Link>{" "}
+            to go to it.
+          </Typography>
+        </Box>
+      )}
       <DialogActions>
         <Button onClick={handleDialogClose} disabled={isBusy}>Cancel</Button>
         <Button

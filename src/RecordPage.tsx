@@ -113,6 +113,7 @@ function RecordPageInner() {
 
   const [audioInitialized, setAudioInitialized] = useState(false);
   const [hasUnversionedReplacements, setHasUnversionedReplacements] = useState(false);
+  const [hasUnversionedRendering, setHasUnversionedRendering] = useState(false);
   const [versions, setVersions] = useState<PassageVersion[]>([]);
   const [versionsDialogOpen, setVersionsDialogOpen] = useState(false);
 
@@ -153,6 +154,7 @@ function RecordPageInner() {
         (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
       );
       setVersions(sortedVersions);
+      setHasUnversionedRendering(passage.unversionedRendering != null);
       if (passage.speaker) setSelectedSpeaker(passage.speaker);
       if (!blob) {
         setAudioInitialized(true);
@@ -179,6 +181,22 @@ function RecordPageInner() {
   }, [token, passageId]);
 
   const busy = compressing || uploading;
+
+  function goToReplaceAI(extra?: {
+    initialSelection?: { start: number; end: number } | null;
+  }) {
+    navigate("/replace-ai", {
+      state: {
+        passageId,
+        passageReference,
+        projectName,
+        speaker: selectedSpeaker,
+        sectionPassages,
+        passageVersion: renderSource?.version ?? passageAudio?.version ?? null,
+        ...extra,
+      },
+    });
+  }
 
   async function handleFileSelected(file: File) {
     if (!token) {
@@ -493,18 +511,7 @@ function RecordPageInner() {
             onRecordingComplete={handleRecordingComplete}
             menuItems={
               <MenuItem
-                onClick={() =>
-                  navigate("/replace-ai", {
-                    state: {
-                      passageId,
-                      passageReference,
-                      projectName,
-                      speaker: selectedSpeaker,
-                      sectionPassages,
-                      passageVersion: renderSource?.version ?? passageAudio?.version ?? null,
-                    },
-                  })
-                }
+                onClick={() => goToReplaceAI()}
               >
                 <ListItemIcon>
                   <GraphicEqIcon />
@@ -540,19 +547,7 @@ function RecordPageInner() {
           <Box sx={{ display: "flex", justifyContent: "center", pt: 6 }}>
             <Button
               startIcon={<GraphicEqIcon />}
-              onClick={() =>
-                navigate("/replace-ai", {
-                  state: {
-                    passageId,
-                    passageReference,
-                    projectName,
-                    speaker: selectedSpeaker,
-                    sectionPassages,
-                    passageVersion: renderSource?.version ?? passageAudio?.version ?? null,
-                    initialSelection: selection,
-                  },
-                })
-              }
+              onClick={() => goToReplaceAI({ initialSelection: selection })}
             >
               {hasUnversionedReplacements ? "Resume Replace (AI)" : "Replace (AI)"}
             </Button>
@@ -704,6 +699,11 @@ function RecordPageInner() {
           onMessage={setSnackMsg}
           onUseVersion={handleVersionSelected}
           onDeleteVersion={handleDeleteVersion}
+          hasUnversionedRendering={hasUnversionedRendering}
+          onGoToReplaceAI={() => {
+            setVersionsDialogOpen(false);
+            goToReplaceAI();
+          }}
         />
       )}
     </Box>
