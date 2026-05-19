@@ -213,7 +213,8 @@ const haveReplacementsChanged = useMemo(() => {
       setRenderedBlob(renderedBlob);
       setHasUnversionedRendering(!!unversionedBlob);
 
-      if (!!renderedBlob) {
+      // If there is an AI rendering, and the user has no selection being imported, show the rendering
+      if (!!renderedBlob && !initialSelection) {
         setShowRendered(true);
       }
 
