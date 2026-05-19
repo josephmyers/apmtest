@@ -547,6 +547,7 @@ function RecordPageInner() {
           <Box sx={{ display: "flex", justifyContent: "center", pt: 6 }}>
             <Button
               startIcon={<GraphicEqIcon />}
+              variant={hasUnversionedRendering ? "primary" : undefined}
               onClick={() => goToReplaceAI({ initialSelection: selection })}
             >
               {hasUnversionedReplacements ? "Resume Replace (AI)" : "Replace (AI)"}
@@ -651,7 +652,7 @@ function RecordPageInner() {
 
         <Button
           startIcon={<Checkbox size="small" sx={{ p: 0, "&.Mui-disabled": { color: "inherit" } }} disabled />}
-          variant={selectedSpeaker && passageAudio ? "primary" : undefined}
+          variant={selectedSpeaker && passageAudio && !hasUnversionedRendering ? "primary" : undefined}
           onClick={() => {
             /* stub */
           }}
