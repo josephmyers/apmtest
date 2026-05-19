@@ -160,8 +160,6 @@ export default function ReplaceAIPage() {
     { start: number; end: number; color: string }[]
   >([]);
   const offsetMapRef = useRef<OffsetEntry[]>([]);
-  const pendingExitRef = useRef<{ path: string | number; options?: { state: any } } | null>(null);
-
   // When editing a replacement, holds the composed audio/highlights/offsetMap
   // computed from all replacements EXCEPT the one being edited.
   const editSourceRef = useRef<{
@@ -267,31 +265,27 @@ const haveReplacementsChanged = useMemo(() => {
     };
   }, [passageAudio, replacements]);
 
-  const guardedNavigate = (path: string | number, options?: { state: any }) => {
+  const guardedNavigate = () => {
     if (shouldGuardNavigation) {
-      pendingExitRef.current = { path, options };
       setConfirmExitOpen(true);
-    } else if (typeof path === "number") {
-      navigate(path);
     } else {
-      navigate(path, options);
+      navigate("/record", { state });
     }
   };
 
   const confirmExit = async () => {
     setConfirmExitOpen(false);
-    const dest = pendingExitRef.current;
-    pendingExitRef.current = null;
-    if (!dest) return;
-    await handleReset();
-    if (typeof dest.path === "number") {
-      navigate(dest.path);
+    // If you have an unversioned rendering, reset to those replacements;
+    // otherwise, you can delete your working copy
+    if (hasUnversionedRendering) {
+      await handleReset();
     } else {
-      navigate(dest.path, dest.options);
+      deleteUnversionedReplacements(token!, passageId);
     }
+    navigate("/record", { state });
   };
 
-  const handleExit = () => guardedNavigate("/record", { state });
+  const handleExit = () => guardedNavigate();
 
   // Guard browser refresh / tab close
   useEffect(() => {
@@ -307,7 +301,6 @@ const haveReplacementsChanged = useMemo(() => {
     window.history.pushState(null, "", window.location.href);
     const handler = () => {
       window.history.pushState(null, "", window.location.href);
-      pendingExitRef.current = { path: "/record", options: { state } };
       setConfirmExitOpen(true);
     };
     window.addEventListener("popstate", handler);
@@ -593,12 +586,12 @@ const haveReplacementsChanged = useMemo(() => {
     navigate("/record", { state });
   };
 
-  const handleDiscardAndExit = () => {
+  const handleDiscardAndExitClick = () => {
     setMenuAnchorEl(null);
     setConfirmDiscardExitOpen(true);
   };
 
-  const confirmDiscardAndExit = async () => {
+  const discardAndExit = async () => {
     setConfirmDiscardExitOpen(false);
     setIsBusy(true);
     try {
@@ -757,9 +750,9 @@ const haveReplacementsChanged = useMemo(() => {
             open={Boolean(menuAnchorEl)}
             onClose={() => setMenuAnchorEl(null)}
           >
-            <MenuItem onClick={handleDiscardAndExit}>
+            <MenuItem onClick={handleDiscardAndExitClick}>
               <HideSourceIcon fontSize="small" sx={{ mr: 1 }} />
-              Reset and Exit
+              Discard and Exit
             </MenuItem>
           </Menu>
         </Box>
@@ -1008,7 +1001,7 @@ const haveReplacementsChanged = useMemo(() => {
         </DialogActions>
       </Dialog>
 
-      {/* ─── Confirm Reset And Exit Dialog ──────────────── */}
+      {/* ─── Confirm Discard And Exit Dialog ──────────────── */}
       <Dialog
         open={confirmDiscardExitOpen}
         onClose={() => { setConfirmDiscardExitOpen(false); setKeepReplacements(true); }}
@@ -1033,11 +1026,10 @@ const haveReplacementsChanged = useMemo(() => {
           <Button
             onClick={() => { setConfirmDiscardExitOpen(false); setKeepReplacements(true); }}
             variant="primary"
-            disabled={isBusy}
           >
             Cancel
           </Button>
-          <Button onClick={confirmDiscardAndExit} disabled={isBusy}>
+          <Button onClick={discardAndExit}>
             Confirm
           </Button>
         </DialogActions>
