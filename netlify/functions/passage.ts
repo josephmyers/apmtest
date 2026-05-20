@@ -34,7 +34,7 @@ export default handle(async (req: Request) => {
     }
 
     const rows = await sql`
-      SELECT id, section_id, reference, description, sort_order, audio_key, unversioned_rendering, speaker, created_at
+      SELECT id, section_id, reference, description, sort_order, audio_key, unversioned_rendering, speaker, current_step, created_at
       FROM passages WHERE id = ${passageId}
     `;
     if (rows.length === 0) throw new HttpError(404, "Passage not found");
@@ -50,6 +50,7 @@ export default handle(async (req: Request) => {
         audioKey: p.audio_key ?? null,
         unversionedRendering: p.unversioned_rendering ?? null,
         speaker: p.speaker ?? null,
+        current_step: p.current_step,
         createdAt: p.created_at,
       },
     });

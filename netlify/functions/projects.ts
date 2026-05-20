@@ -201,11 +201,29 @@ export default handle(async (req: Request) => {
     }
 
     if (body.passageId != null) {
-      const { passageId, reference } = body as { passageId: number; reference: string };
-      if (!passageId || typeof reference !== "string" || !reference.trim()) {
-        throw new HttpError(400, "passageId and reference are required");
-      }
+      const passageId = Number(body.passageId);
+      if (!passageId) throw new HttpError(400, "passageId is required");
       await assertPassageAccess(sql, user.userId, passageId);
+
+      // Update current step
+      if (body.currentStep !== undefined) {
+        const currentStep = Number(body.currentStep);
+        if (!Number.isFinite(currentStep) || currentStep < 1) {
+          throw new HttpError(400, "currentStep must be a positive integer");
+        }
+        const result = await sql`
+          UPDATE passages SET current_step = ${currentStep} WHERE id = ${passageId}
+          RETURNING *
+        `;
+        if (result.length === 0) throw new HttpError(404, "Passage not found");
+        return jsonRes({ passage: result[0] });
+      }
+
+      // Update reference
+      const { reference } = body as { reference: string };
+      if (typeof reference !== "string" || !reference.trim()) {
+        throw new HttpError(400, "reference is required");
+      }
       const result = await sql`
         UPDATE passages SET reference = ${reference.trim()} WHERE id = ${passageId}
         RETURNING *

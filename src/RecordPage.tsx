@@ -3,26 +3,22 @@ import { useLocation, useNavigate } from "react-router-dom";
 import {
   Box,
   Button,
-  Checkbox,
   CircularProgress,
   IconButton,
   ListItemIcon,
   ListItemText,
-  Menu,
   MenuItem,
   Typography,
 } from "@mui/material";
 import { useSnackbar } from "./useSnackbar";
 import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
 import FolderOpenIcon from "@mui/icons-material/FolderOpen";
-import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import GraphicEqIcon from "@mui/icons-material/GraphicEq";
 import InsertDriveFileOutlinedIcon from "@mui/icons-material/InsertDriveFileOutlined";
 
 import StopIcon from "@mui/icons-material/Stop";
 import PauseIcon from "@mui/icons-material/Pause";
 import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
-import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 
 import { useAuth } from "./AuthContext";
 import {
@@ -42,30 +38,9 @@ import { compressToMp3 } from "./audioUtils";
 import SpeakerDialog from "./SpeakerDialog";
 import { AudioPlayer, type AudioPlayerHandle } from "./AudioPlayer";
 import PageHeader from "./PageHeader";
+import StepFooter from "./StepFooter";
+import { type StepNavState } from "./steps";
 import VersionsDialog, { type UseVersionResult } from "./VersionsDialog";
-
-interface RecordPageState {
-  passageId: number;
-  passageReference: string;
-  projectName: string;
-  projectId?: number;
-  speaker?: string | null;
-  sectionPassages?: { id: number; reference: string; speaker: string | null }[];
-}
-
-/** Hardcoded step colours for the racetrack indicator */
-const STEP_COLORS = [
-  "#111",
-  "#ccc",
-  "#ccc",
-  "#ccc",
-  "#ccc",
-  "#ccc",
-  "#ccc",
-  "#ccc",
-  "#ccc",
-  "#ccc",
-];
 
 /**
  * Thin wrapper that keys the real page on passageId so React fully
@@ -73,7 +48,7 @@ const STEP_COLORS = [
  */
 export default function RecordPage() {
   const location = useLocation();
-  const state = (location.state ?? {}) as RecordPageState;
+  const state = (location.state ?? {}) as StepNavState;
   const passageId = state.passageId;
 
   return <RecordPageInner key={passageId} />;
@@ -83,7 +58,7 @@ function RecordPageInner() {
   const navigate = useNavigate();
   const location = useLocation();
   const { token } = useAuth();
-  const state = (location.state ?? {}) as RecordPageState;
+  const state = (location.state ?? {}) as StepNavState;
 
   const passageIdFromQuery = Number(new URLSearchParams(location.search).get("passageId"));
   const passageId =
@@ -116,9 +91,6 @@ function RecordPageInner() {
   const [hasUnversionedRendering, setHasUnversionedRendering] = useState(false);
   const [versions, setVersions] = useState<PassageVersion[]>([]);
   const [versionsDialogOpen, setVersionsDialogOpen] = useState(false);
-
-  // Passage dropdown state
-  const [passageMenuAnchor, setPassageMenuAnchor] = useState<null | HTMLElement>(null);
 
   // Speaker state
   const [speakerDialogOpen, setSpeakerDialogOpen] = useState(false);
@@ -181,6 +153,15 @@ function RecordPageInner() {
   }, [token, passageId]);
 
   const busy = compressing || uploading;
+
+  const nav: StepNavState = {
+    passageId,
+    passageReference,
+    projectName,
+    projectId,
+    speaker: selectedSpeaker,
+    sectionPassages,
+  };
 
   function goToReplaceAI(extra?: {
     initialSelection?: { start: number; end: number } | null;
@@ -356,104 +337,8 @@ function RecordPageInner() {
         leftIcon="back"
         onLeftClick={() => navigate(projectId ? `/projects/${projectId}` : "/projects")}
         title={projectName}
-      >
-        {/* Racetrack row */}
-        <Box
-          sx={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            pb: 1,
-            px: 2,
-          }}
-        >
-          <Box
-            sx={{
-              position: "relative",
-              display: "flex",
-              alignItems: "center",
-              width: "100%",
-            }}
-          >
-            {/* Passage dropdown — always a flex item; sits on top on large screens */}
-            <Box sx={{ flexShrink: 0, position: "relative", zIndex: 1, mr: 1 }}>
-              <Button
-                size="small"
-                endIcon={<ArrowDropDownIcon />}
-                sx={{
-                  whiteSpace: "nowrap",
-                  minWidth: "auto",
-                }}
-                onClick={(e) => setPassageMenuAnchor(e.currentTarget)}
-              >
-                {passageReference}
-              </Button>
-              <Menu
-                anchorEl={passageMenuAnchor}
-                open={Boolean(passageMenuAnchor)}
-                onClose={() => setPassageMenuAnchor(null)}
-              >
-                {sectionPassages.map((p) => (
-                  <MenuItem
-                    key={p.id}
-                    selected={p.id === passageId}
-                    onClick={() => {
-                      setPassageMenuAnchor(null);
-                      if (p.id !== passageId) {
-                        navigate("/record", {
-                          state: {
-                            passageId: p.id,
-                            passageReference: p.reference,
-                            projectName,
-                            speaker: p.speaker,
-                            sectionPassages,
-                          },
-                        });
-                      }
-                    }}
-                  >
-                    {p.reference}
-                  </MenuItem>
-                ))}
-              </Menu>
-            </Box>
-
-            {/* Parallelograms
-                - Small screens: flex item starting at dropdown edge, scrolls right
-                - Large screens: absolutely spans full row width (behind dropdown) */}
-            <Box
-              sx={{
-                overflowX: "auto",
-                display: "flex",
-                // small: regular flex item, left-aligned so scroll works correctly
-                flex: { xs: 1, md: "none" },
-                justifyContent: { xs: "flex-start", md: "center" },
-                // large: absolute to cover full width including dropdown
-                position: { md: "absolute" },
-                left: { md: 0 },
-                right: { md: 0 },
-              }}
-            >
-              {STEP_COLORS.map((color, i) => (
-                <Box
-                  key={i}
-                  sx={{
-                    flex: "0 0 80px",
-                    height: 30,
-                    bgcolor: color,
-                    mr: -0.25,
-                    clipPath: "polygon(10% 0%, 100% 0%, 90% 100%, 0% 100%)",
-                  }}
-                />
-              ))}
-            </Box>
-
-            {/* Spacer gives the row its height on large screens (absolute children don't contribute) */}
-            <Box sx={{ height: 30, flex: 1, display: { xs: "none", md: "block" } }} />
-          </Box>
-          <Typography sx={{ mt: 1, fontWeight: 500 }}>Record</Typography>
-        </Box>
-      </PageHeader>
+        racetrack={{ token, nav }}
+      />
 
       {/* ─── Main Content ─────────────────────────────────────────── */}
       <Box
@@ -636,39 +521,12 @@ function RecordPageInner() {
       </Box>
 
       {/* ─── Footer ───────────────────────────────────────────────── */}
-      <Box
-        sx={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          borderTop: 1,
-          borderColor: "divider",
-          bgcolor: "#eee",
-          px: 1,
-          py: 1,
-        }}
-      >
-        <Box sx={{ width: 90 }} />
-
-        <Button
-          startIcon={<Checkbox size="small" sx={{ p: 0, "&.Mui-disabled": { color: "inherit" } }} disabled />}
-          variant={selectedSpeaker && passageAudio && !hasUnversionedRendering ? "primary" : undefined}
-          onClick={() => {
-            /* stub */
-          }}
-        >
-          Step Complete
-        </Button>
-
-        <Button
-          endIcon={<ChevronRightIcon />}
-          onClick={() => {
-            /* stub */
-          }}
-        >
-          Next
-        </Button>
-      </Box>
+      <StepFooter
+        token={token}
+        canComplete={Boolean(selectedSpeaker && passageAudio && !hasUnversionedRendering)}
+        nav={nav}
+        onError={setSnackMsg}
+      />
 
       {snackbarElement}
 

@@ -45,6 +45,7 @@ import {
   type Project,
   type Section,
 } from "./api";
+import { getStep, type StepNavState } from "./steps";
 
 type TabId = "overview" | "audio" | "assignments" | "transcriptions";
 
@@ -615,6 +616,7 @@ function PassageCard({
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
   const [renameOpen, setRenameOpen] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const step = getStep(passage.current_step);
 
   const handleRename = async (reference: string) => {
     if (!token) return;
@@ -766,24 +768,24 @@ function PassageCard({
             justifyContent: "space-between",
           }}
           endIcon={<ChevronRightIcon />}
-          onClick={() =>
-            navigate("/record", {
-              state: {
-                passageId: passage.id,
-                passageReference: passage.reference,
-                projectName,
-                projectId,
-                speaker: passage.speaker,
-                sectionPassages: section.passages.map((p) => ({
-                  id: p.id,
-                  reference: p.reference,
-                  speaker: p.speaker,
-                })),
-              },
-            })
-          }
+          onClick={() => {
+            const navState: StepNavState = {
+              passageId: passage.id,
+              passageReference: passage.reference,
+              projectName,
+              projectId,
+              speaker: passage.speaker,
+              sectionPassages: section.passages.map((p) => ({
+                id: p.id,
+                reference: p.reference,
+                speaker: p.speaker,
+                current_step: p.current_step,
+              })),
+            };
+            navigate(step.route, { state: navState });
+          }}
         >
-          Record
+          {step.title}
         </Button>
       </Box>
     </Card>

@@ -14,6 +14,7 @@ import Dashboard from "./Dashboard";
 import ProjectsPage from "./ProjectsPage";
 import SwitchTeamsPage from "./SwitchTeamsPage";
 import RecordPage from "./RecordPage";
+import QAPrepPage from "./QAPrepPage";
 import ReplaceAIPage from "./ReplaceAIPage";
 
 const PRIMARY_MAIN = "#1f80ff";
@@ -22,7 +23,7 @@ const RECORD_READY_RED = "#D32F2F";
 /** Central width-based breakpoints (px) */
 export const BREAKPOINTS = {
   xs: 0,
-  sm: 420,
+  sm: 435,
   md: 600,
   lg: 900,
   xl: 1200,
@@ -281,6 +282,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <RecordPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/qa-prep"
+        element={
+          <ProtectedRoute>
+            <QAPrepPage />
           </ProtectedRoute>
         }
       />

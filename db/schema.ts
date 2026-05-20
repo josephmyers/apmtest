@@ -40,6 +40,7 @@ export const passages = pgTable('passages', {
     audioKey: varchar('audio_key', { length: 255 }),
     unversionedRendering: varchar('unversioned_rendering', { length: 255 }),
     speaker: varchar('speaker', { length: 255 }),
+    currentStep: integer('current_step').notNull().default(1),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 });
 

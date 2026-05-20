@@ -18,6 +18,7 @@ export interface Passage {
   audioKey: string | null;
   unversionedRendering: string | null;
   speaker: string | null;
+  current_step: number;
   createdAt: string;
 }
 
@@ -395,6 +396,24 @@ export async function renamePassage(
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "Failed to rename passage");
+  return data;
+}
+
+export async function setPassageStep(
+  token: string,
+  passageId: number,
+  currentStep: number,
+): Promise<{ passage: Passage }> {
+  const res = await fetch(`${API_BASE}/projects`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ passageId, currentStep }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Failed to update passage step");
   return data;
 }
 

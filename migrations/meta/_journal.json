@@ -29,6 +29,13 @@
       "when": 1779128667759,
       "tag": "0003_fixed_rage",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1779219114549,
+      "tag": "0004_shallow_yellowjacket",
+      "breakpoints": true
     }
   ]
 }
