@@ -110,21 +110,27 @@ export default function Racetrack({ token, nav }: RacetrackProps) {
           }}
         >
           {STEPS.map((step) => {
-            const color =
-              step.id === viewedStepId
-                ? "#111"
-                : currentStep != null && step.id < currentStep
-                  ? "#888"
-                  : "#ccc";
+            const isViewed = step.id === viewedStepId;
+            const color = isViewed
+              ? "#111"
+              : currentStep != null && step.id < currentStep
+                ? "#888"
+                : "#ccc";
             return (
               <Box
                 key={step.id}
+                onClick={
+                  isViewed
+                    ? undefined
+                    : () => navigate(step.route, { state: nav })
+                }
                 sx={{
                   flex: "0 0 80px",
                   height: 30,
                   bgcolor: color,
                   mr: -0.25,
                   clipPath: "polygon(10% 0%, 100% 0%, 90% 100%, 0% 100%)",
+                  cursor: isViewed ? "default" : "pointer",
                 }}
               />
             );
