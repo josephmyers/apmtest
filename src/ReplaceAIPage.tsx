@@ -428,7 +428,7 @@ const haveReplacementsChanged = useMemo(() => {
       setAddDialogOpen(false);
       setEditingReplacement(null);
       editSourceRef.current = null;
-      
+
       playerRef.current?.updateSelection(null);
       playerRef.current?.setTime(0);
       playerRef.current?.resetZoom();
@@ -813,7 +813,7 @@ const haveReplacementsChanged = useMemo(() => {
         {/* Replacement rows + Add Replacement row in chronological order */}
         {!showRendered &&
           replacementRows.map((row) => {
-            // Added
+            // Add Replacement
             if (row.type === "add") {
               return (
               <Stack
@@ -842,11 +842,8 @@ const haveReplacementsChanged = useMemo(() => {
               );
             }
 
-            // Edited
+            // Replacements
             const r = row.replacement;
-            const baseReplacement = activeReplacements.find((s) => s.id === r.id);
-            const isEdited =
-              !!renderedBlob && !!baseReplacement && !sameReplacementContent(r, baseReplacement);
             return (
               <Stack
                 key={r.id}
@@ -873,11 +870,6 @@ const haveReplacementsChanged = useMemo(() => {
                     ),
                   )}
                 </Typography>
-                {isEdited && (
-                  <Typography variant="body2" color="text.secondary">
-                    (Changed)
-                  </Typography>
-                )}
                 <Box sx={{ flex: 1 }} />
                 <IconButton
                   size="small"
