@@ -417,6 +417,24 @@ export async function setPassageStep(
   return data;
 }
 
+export async function setPassageSpeaker(
+  token: string,
+  passageId: number,
+  speaker: string,
+): Promise<{ passage: Passage }> {
+  const res = await fetch(`${API_BASE}/projects`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ passageId, speaker }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Failed to update passage speaker");
+  return data;
+}
+
 export async function fetchAudio(
   token: string,
   passageId: number,
@@ -457,6 +475,24 @@ export async function getPassage(
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "Failed to fetch passage");
+  return data;
+}
+
+export interface SectionPassage {
+  id: number;
+  reference: string;
+  current_step: number;
+}
+
+export async function getSectionPassages(
+  token: string,
+  passageId: number,
+): Promise<{ sectionPassages: SectionPassage[] }> {
+  const res = await fetch(`${API_BASE}/section?passageId=${passageId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Failed to fetch section passages");
   return data;
 }
 

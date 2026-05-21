@@ -57,11 +57,4 @@ export interface StepNavState {
   passageReference: string;
   projectName: string;
   projectId?: number;
-  speaker?: string | null;
-  sectionPassages?: {
-    id: number;
-    reference: string;
-    speaker: string | null;
-    current_step: number;
-  }[];
 }

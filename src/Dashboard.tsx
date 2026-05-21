@@ -535,7 +535,6 @@ function SectionRow({
               <Box key={passage.id} sx={{ display: "flex", gap: 2 }}>
                 <PassageCard
                   passage={passage}
-                  section={section}
                   disabled={addPassageMode}
                   token={token}
                   setLoading={setLoading}
@@ -593,7 +592,6 @@ function InsertSlot({ onClick }: { onClick: () => void }) {
 
 function PassageCard({
   passage,
-  section,
   disabled,
   token,
   setLoading,
@@ -603,7 +601,6 @@ function PassageCard({
   structureEditsAllowed,
 }: {
   passage: Passage;
-  section: Section;
   disabled?: boolean;
   token: string | null;
   setLoading: React.Dispatch<React.SetStateAction<boolean>>;
@@ -774,13 +771,6 @@ function PassageCard({
               passageReference: passage.reference,
               projectName,
               projectId,
-              speaker: passage.speaker,
-              sectionPassages: section.passages.map((p) => ({
-                id: p.id,
-                reference: p.reference,
-                speaker: p.speaker,
-                current_step: p.current_step,
-              })),
             };
             navigate(step.route, { state: navState });
           }}

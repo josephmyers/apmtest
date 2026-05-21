@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
+  Backdrop,
   Box,
   Button,
   CircularProgress,
@@ -25,12 +26,11 @@ import {
   fetchAudio,
   createPassageVersion,
   deletePassageVersion,
-  getPassage,
   getReplacements,
   listPassageVersions,
-  fetchVersionAudio,
   deleteUnversionedReplacements,
   getSpeakers,
+  setPassageSpeaker,
   type Speaker,
   type PassageVersion,
 } from "./api";
@@ -39,43 +39,39 @@ import SpeakerDialog from "./SpeakerDialog";
 import { AudioPlayer, type AudioPlayerHandle } from "./AudioPlayer";
 import PageHeader from "./PageHeader";
 import StepFooter from "./StepFooter";
+import { PassageProvider, usePassage } from "./PassageContext";
 import { type StepNavState } from "./steps";
 import VersionsDialog, { type UseVersionResult } from "./VersionsDialog";
 
 /**
- * Thin wrapper that keys the real page on passageId so React fully
- * unmounts / remounts whenever the user switches passages.
+ * Outer wrapper: keys PassageProvider on passageId so its state
+ * fully resets when the user switches passages.
  */
 export default function RecordPage() {
-  const location = useLocation();
-  const state = (location.state ?? {}) as StepNavState;
+  const state = (useLocation().state ?? {}) as StepNavState;
   const passageId = state.passageId;
-
-  return <RecordPageInner key={passageId} />;
+  return (
+    <PassageProvider key={passageId}>
+      <RecordPageInner />
+    </PassageProvider>
+  );
 }
 
 function RecordPageInner() {
   const navigate = useNavigate();
-  const location = useLocation();
   const { token } = useAuth();
-  const state = (location.state ?? {}) as StepNavState;
+  const { passage } = usePassage();
 
-  const passageIdFromQuery = Number(new URLSearchParams(location.search).get("passageId"));
-  const passageId =
-    state.passageId || (Number.isFinite(passageIdFromQuery) ? passageIdFromQuery : 0);
-  const passageReference = state.passageReference ?? "Unknown Passage";
-  const projectName = state.projectName ?? "";
-  const projectId = state.projectId;
-  const sectionPassages = state.sectionPassages ?? [];
+  const nav = useLocation().state as StepNavState;
+  const passageId = nav?.passageId ?? 0;
+  const passageReference = nav?.passageReference ?? "Unknown Passage";
+  const projectName = nav?.projectName ?? "";
+  const projectId = nav?.projectId;
 
   // Audio state
   const fileInputRef = useRef<HTMLInputElement>(null);
   const playerRef = useRef<AudioPlayerHandle>(null);
   const [passageAudio, setPassageAudio] = useState<{
-    blob: Blob;
-    version: PassageVersion;
-  } | null>(null);
-  const [renderSource, setRenderSource] = useState<{
     blob: Blob;
     version: PassageVersion;
   } | null>(null);
@@ -92,10 +88,13 @@ function RecordPageInner() {
   const [versions, setVersions] = useState<PassageVersion[]>([]);
   const [versionsDialogOpen, setVersionsDialogOpen] = useState(false);
 
-  // Speaker state
   const [speakerDialogOpen, setSpeakerDialogOpen] = useState(false);
   const [speakers, setSpeakers] = useState<Speaker[]>([]);
   const [selectedSpeaker, setSelectedSpeaker] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (passage?.speaker) setSelectedSpeaker(passage.speaker);
+  }, [passage?.speaker]);
 
   // Fetch speakers list on mount
   useEffect(() => {
@@ -109,25 +108,19 @@ function RecordPageInner() {
 
   // Load existing audio, passage details, and versions on mount
   useEffect(() => {
-    if (!token || !passageId) {
-      setAudioInitialized(true);
+    if (!token || !passage) {
       return;
     }
-    // Use nav-state speaker as fast initial value
-    if (state.speaker) {
-      setSelectedSpeaker(state.speaker);
-    }
+
     Promise.all([
       fetchAudio(token, passageId),
-      getPassage(token, passageId),
       listPassageVersions(token, passageId),
-    ]).then(([blob, { passage }, { versions }]) => {
+    ]).then(([blob, { versions }]) => {
       const sortedVersions = [...versions].sort(
         (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
       );
       setVersions(sortedVersions);
       setHasUnversionedRendering(passage.unversionedRendering != null);
-      if (passage.speaker) setSelectedSpeaker(passage.speaker);
       if (!blob) {
         setAudioInitialized(true);
         return;
@@ -139,29 +132,13 @@ function RecordPageInner() {
       }
       setPassageAudio({ blob, version });
       setAudioInitialized(true);
-
-      const renderSourceVersion = versions.find((v) => v.audioKey === version.renderSource);
-      if (renderSourceVersion) {
-        fetchVersionAudio(token, renderSourceVersion.id).then((rsBlob) => {
-          if (rsBlob) setRenderSource({ blob: rsBlob, version: renderSourceVersion });
-        });
-      }
     });
     getReplacements(token, passageId, null).then((reps) => {
       setHasUnversionedReplacements(reps.length > 0);
     });
-  }, [token, passageId]);
+  }, [token, passage]);
 
   const busy = compressing || uploading;
-
-  const nav: StepNavState = {
-    passageId,
-    passageReference,
-    projectName,
-    projectId,
-    speaker: selectedSpeaker,
-    sectionPassages,
-  };
 
   function goToReplaceAI(extra?: {
     initialSelection?: { start: number; end: number } | null;
@@ -171,9 +148,8 @@ function RecordPageInner() {
         passageId,
         passageReference,
         projectName,
-        speaker: selectedSpeaker,
-        sectionPassages,
-        passageVersion: renderSource?.version ?? passageAudio?.version ?? null,
+        speaker: passage?.speaker,
+        passageVersion: passageAudio!.version,
         ...extra,
       },
     });
@@ -211,7 +187,6 @@ function RecordPageInner() {
       // Set audio source for playback
       setPassageAudio({ blob: mp3Blob, version });
       setVersions((prev) => [version, ...prev.filter((v) => v.id !== version.id)]);
-      setRenderSource(null);
       setSnackMsg("Audio saved!");
     } catch (err) {
       setSnackMsg(err instanceof Error ? err.message : "Failed to process audio");
@@ -285,7 +260,6 @@ function RecordPageInner() {
       });
       setPassageAudio({ blob: mp3Blob, version });
       setVersions((prev) => [version, ...prev.filter((v) => v.id !== version.id)]);
-      setRenderSource(null);
       deleteUnversionedReplacements(token, passageId);
       setHasUnversionedReplacements(false);
       setSnackMsg("Audio saved!");
@@ -300,9 +274,9 @@ function RecordPageInner() {
   async function handleVersionSelected(data: UseVersionResult) {
     if (!token) return;
     setPassageAudio({ blob: data.blob, version: data.version });
-    setRenderSource(data.renderSource);
     deleteUnversionedReplacements(token, passageId);
     setHasUnversionedReplacements(false);
+    setHasUnversionedRendering(false);
     setVersionsDialogOpen(false);
     setSnackMsg("Version loaded!");
   }
@@ -313,10 +287,6 @@ function RecordPageInner() {
     setVersions((prev) => prev.filter((v) => v.id !== version.id));
     if (passageAudio?.version.id === version.id) {
       setPassageAudio(null);
-      setRenderSource(null);
-    }
-    if (renderSource?.version.id === version.id) {
-      setRenderSource(null);
     }
     setSnackMsg("Version deleted.");
   }
@@ -332,12 +302,19 @@ function RecordPageInner() {
         },
       }}
     >
+      <Backdrop
+        open={!audioInitialized}
+        sx={{ zIndex: (theme) => theme.zIndex.modal + 1 }}
+      >
+        <CircularProgress color="inherit" />
+      </Backdrop>
+
       {/* ─── Header ───────────────────────────────────────────────── */}
       <PageHeader
         leftIcon="back"
         onLeftClick={() => navigate(projectId ? `/projects/${projectId}` : "/projects")}
         title={projectName}
-        racetrack={{ token, nav }}
+        racetrack
       />
 
       {/* ─── Main Content ─────────────────────────────────────────── */}
@@ -522,9 +499,8 @@ function RecordPageInner() {
 
       {/* ─── Footer ───────────────────────────────────────────────── */}
       <StepFooter
-        token={token}
-        canComplete={Boolean(selectedSpeaker && passageAudio && !hasUnversionedRendering)}
-        nav={nav}
+        canComplete={Boolean(selectedSpeaker && passageAudio)}
+        isCompletePrimary={!hasUnversionedRendering}
         onError={setSnackMsg}
       />
 
@@ -542,6 +518,9 @@ function RecordPageInner() {
             if (prev.some((speaker) => speaker.name === speakerName)) return prev;
             return [...prev, { name: speakerName }].sort((a, b) => a.name.localeCompare(b.name));
           });
+          if (token && passageId) {
+            setPassageSpeaker(token, passageId, speakerName);
+          }
         }}
         onError={setSnackMsg}
       />

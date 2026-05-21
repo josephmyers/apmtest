@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Box, Button, Menu, MenuItem, Typography } from "@mui/material";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
-import { getPassage } from "./api";
+import { usePassage } from "./PassageContext";
 import {
   STEPS,
   getStep,
@@ -10,29 +10,18 @@ import {
   type StepNavState,
 } from "./steps";
 
-export interface RacetrackProps {
-  token: string | null;
-  nav: StepNavState;
-}
-
-export default function Racetrack({ token, nav }: RacetrackProps) {
+export default function Racetrack() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { currentStep, sectionPassages } = usePassage();
+  const nav = location.state as StepNavState;
   const viewedStep = stepForRoute(location.pathname);
   const [passageMenuAnchor, setPassageMenuAnchor] = useState<null | HTMLElement>(null);
-  const [currentStep, setCurrentStep] = useState<number | undefined>();
-
-  const { passageId, passageReference, projectName, projectId } = nav;
-  const sectionPassages = nav.sectionPassages ?? [];
-
-  useEffect(() => {
-    if (!token || !passageId) return;
-    getPassage(token, passageId).then(({ passage }) => setCurrentStep(passage.current_step))
-  }, [token, passageId]);
 
   if (!viewedStep) return null;
   const viewedStepId = viewedStep.id;
   const viewedTitle = viewedStep.title;
+  const { passageId, passageReference, projectName, projectId } = nav ?? {};
 
   return (
     <Box
@@ -82,8 +71,6 @@ export default function Racetrack({ token, nav }: RacetrackProps) {
                       passageReference: p.reference,
                       projectName,
                       projectId,
-                      speaker: p.speaker,
-                      sectionPassages,
                     };
                     navigate(getStep(p.current_step).route, { state });
                   }

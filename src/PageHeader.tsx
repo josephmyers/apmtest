@@ -5,7 +5,7 @@ import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import { useAuth } from "./AuthContext";
 import appIcon from "./assets/icon.png";
-import Racetrack, { type RacetrackProps } from "./Racetrack";
+import Racetrack from "./Racetrack";
 
 interface PageHeaderProps {
   title: string;
@@ -19,8 +19,8 @@ interface PageHeaderProps {
   rightActions?: React.ReactNode;
   /** Dims the header and disables interaction (e.g. Dashboard's add-passage mode). */
   disabled?: boolean;
-  /** When provided, renders the step racetrack below the toolbar (step pages). */
-  racetrack?: RacetrackProps;
+  /** When true, renders the step racetrack below the toolbar (step pages). */
+  racetrack?: boolean;
   /** Extra content rendered inside the AppBar below the toolbar. */
   children?: React.ReactNode;
 }
@@ -93,7 +93,7 @@ export default function PageHeader({
           <MenuItem onClick={() => { setAccountAnchor(null); logout(); }}>Log Out</MenuItem>
         </Menu>
       </Toolbar>
-      {racetrack && <Racetrack {...racetrack} />}
+      {racetrack && <Racetrack />}
       {children}
     </AppBar>
   );

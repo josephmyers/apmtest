@@ -1,37 +1,55 @@
+import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Box, Typography } from "@mui/material";
+import { Backdrop, Box, CircularProgress, Typography } from "@mui/material";
 import { useAuth } from "./AuthContext";
 import { useSnackbar } from "./useSnackbar";
 import PageHeader from "./PageHeader";
 import StepFooter from "./StepFooter";
+import { PassageProvider, usePassage } from "./PassageContext";
+import { fetchAudio, listPassageVersions, type PassageVersion } from "./api";
 import { type StepNavState } from "./steps";
 
 /**
- * Thin wrapper that keys the real page on passageId so React fully
- * unmounts / remounts whenever the user switches passages.
+ * Thin wrapper that keys PassageProvider on passageId so its state resets
+ * whenever the user switches passages.
  */
 export default function QAPrepPage() {
   const location = useLocation();
   const state = (location.state ?? {}) as StepNavState;
-  return <QAPrepPageInner key={state.passageId} />;
+  return (
+    <PassageProvider key={state.passageId}>
+      <QAPrepPageInner />
+    </PassageProvider>
+  );
 }
 
 function QAPrepPageInner() {
   const navigate = useNavigate();
   const location = useLocation();
   const { token } = useAuth();
+  const { passage } = usePassage();
   const { setSnackMsg, snackbarElement } = useSnackbar();
-  const state = (location.state ?? {}) as StepNavState;
+  const nav = location.state as StepNavState;
+  const projectId = nav?.projectId;
 
-  const projectId = state.projectId;
-  const nav: StepNavState = {
-    passageId: state.passageId ?? 0,
-    passageReference: state.passageReference ?? "Unknown Passage",
-    projectName: state.projectName ?? "",
-    projectId,
-    speaker: state.speaker ?? null,
-    sectionPassages: state.sectionPassages ?? [],
-  };
+  const [, setPassageAudio] = useState<{ blob: Blob; version: PassageVersion } | null>(null);
+  const [audioInitialized, setAudioInitialized] = useState(false);
+
+  useEffect(() => {
+    if (!token || !passage) return;
+    Promise.all([
+      fetchAudio(token, passage.id),
+      listPassageVersions(token, passage.id),
+    ]).then(([blob, { versions }]) => {
+      if (!blob) {
+        setAudioInitialized(true);
+        return;
+      }
+      const version = versions.find((v) => v.audioKey === passage.audioKey)!;
+      setPassageAudio({ blob, version });
+      setAudioInitialized(true);
+    });
+  }, [token, passage]);
 
   return (
     <Box
@@ -44,11 +62,18 @@ function QAPrepPageInner() {
         },
       }}
     >
+      <Backdrop
+        open={!audioInitialized}
+        sx={{ zIndex: (theme) => theme.zIndex.modal + 1 }}
+      >
+        <CircularProgress color="inherit" />
+      </Backdrop>
+
       <PageHeader
         leftIcon="back"
         onLeftClick={() => navigate(projectId ? `/projects/${projectId}` : "/projects")}
-        title={nav.projectName}
-        racetrack={{ token, nav }}
+        title={nav?.projectName ?? ""}
+        racetrack
       />
 
       <Box
@@ -65,12 +90,7 @@ function QAPrepPageInner() {
         </Typography>
       </Box>
 
-      <StepFooter
-        token={token}
-        canComplete
-        nav={nav}
-        onError={setSnackMsg}
-      />
+      <StepFooter canComplete onError={setSnackMsg} />
 
       {snackbarElement}
     </Box>

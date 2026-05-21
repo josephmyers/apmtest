@@ -219,6 +219,20 @@ export default handle(async (req: Request) => {
         return jsonRes({ passage: result[0] });
       }
 
+      // Update speaker
+      if (body.speaker !== undefined) {
+        const speaker = body.speaker;
+        if (typeof speaker !== "string" || !speaker.trim()) {
+          throw new HttpError(400, "speaker is required");
+        }
+        const result = await sql`
+          UPDATE passages SET speaker = ${speaker.trim()} WHERE id = ${passageId}
+          RETURNING *
+        `;
+        if (result.length === 0) throw new HttpError(404, "Passage not found");
+        return jsonRes({ passage: result[0] });
+      }
+
       // Update reference
       const { reference } = body as { reference: string };
       if (typeof reference !== "string" || !reference.trim()) {

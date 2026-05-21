@@ -38,7 +38,6 @@ import {
   fetchAudio,
   fetchVersionAudio,
   fetchUnversionedRendering,
-  getPassage,
   getReplacements,
   listPassageVersions,
   saveReplacement,
@@ -60,9 +59,7 @@ interface ReplaceAIPageState {
   passageReference: string;
   projectName: string;
   speaker?: string | null;
-  //todo remove?
-  sectionPassages?: { id: number; reference: string; speaker: string | null }[];
-  passageVersion?: PassageVersion | null;
+  passageVersion: PassageVersion;
   initialSelection?: { start: number; end: number } | null;
 }
 
@@ -124,16 +121,14 @@ export default function ReplaceAIPage() {
 
   const passageId = state.passageId ?? 0;
   const projectName = state.projectName ?? "";
-  const passageVersion = state.passageVersion ?? null;
+  const activeVersion = state.passageVersion;
   const initialSelection = state.initialSelection ?? null;
 
   const { setSnackMsg, snackbarElement } = useSnackbar();
   const playerRef = useRef<AudioPlayerHandle>(null);
   const initialSelectionHandled = useRef(false);
-  const [passageAudio, setPassageAudio] = useState<{
-    blob: Blob;
-    version: PassageVersion | null;
-  } | null>(null);
+  // This is the renderSource version, if present; otherwise, the passage version
+  const [sourceBlob, setSourceBlob] = useState<Blob | null>(null);
   const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
   const [selection, setSelection] = useState<{
     start: number;
@@ -185,18 +180,23 @@ const haveReplacementsChanged = useMemo(() => {
     if (!token || !passageId) return;
     setIsBusy(true);
     
-    fetchVersionAudio(token, passageVersion?.id ?? passageId).then((blob) => {
-      if (blob) setPassageAudio({ blob, version: passageVersion });
-    });
-
     Promise.all([
       getReplacements(token, passageId, null),
       listPassageVersions(token, passageId),
       getPreservedReplacements(token, passageId),
     ]).then(async ([unversionedReplacements, { versions }, preserved]) => {
       setPreservedReplacements(preserved);
-      const { passage } = await getPassage(token, passageId);
-      const activeVersion = versions.find((v) => v.audioKey === passage.audioKey)!;
+
+      const activeAudio = await fetchAudio(token, passageId);
+
+      // If the active version is AI-rendered, the source is its source version; otherwise, use the raw passage audio
+      if (activeVersion.renderSource) {
+        const sourceVersion = versions.find((v) => v.audioKey === activeVersion.renderSource)!;
+        const source = await fetchVersionAudio(token, sourceVersion.id);
+        setSourceBlob(source);
+      } else {
+        setSourceBlob(activeAudio);
+      }
 
       const versionedReps = await getReplacements(
         token,
@@ -205,9 +205,9 @@ const haveReplacementsChanged = useMemo(() => {
       );
       setVersionNote(activeVersion.note);
 
-      // If there's an unversioned blob, that's the latest; otherwise, use the active audio
+      // If there's an unversioned blob, that's the latest; otherwise, if the active version is AI-rendered, use that
       const unversionedBlob = await fetchUnversionedRendering(token!, passageId);
-      const renderedBlob = unversionedBlob ?? (activeVersion.renderSource ? await fetchAudio(token!, passageId) : null);
+      const renderedBlob = unversionedBlob ?? (activeVersion.renderSource ? activeAudio : null);
       setRenderedBlob(renderedBlob);
       setHasUnversionedRendering(!!unversionedBlob);
 
@@ -243,7 +243,7 @@ const haveReplacementsChanged = useMemo(() => {
 
   // Compose all replacement clips into the passage audio
   useEffect(() => {
-    if (!passageAudio || replacements.length === 0) {
+    if (!sourceBlob || replacements.length === 0) {
       setComposedAudio(null);
       setHighlights([]);
       offsetMapRef.current = [];
@@ -252,7 +252,7 @@ const haveReplacementsChanged = useMemo(() => {
 
     let cancelled = false;
 
-    composeReplacements(passageAudio.blob, replacements).then((result) => {
+    composeReplacements(sourceBlob, replacements).then((result) => {
       if (!cancelled) {
         setComposedAudio(result.blob);
         setHighlights(result.highlights);
@@ -263,7 +263,7 @@ const haveReplacementsChanged = useMemo(() => {
     return () => {
       cancelled = true;
     };
-  }, [passageAudio, replacements]);
+  }, [sourceBlob, replacements]);
 
   const guardedNavigate = () => {
     if (shouldGuardNavigation) {
@@ -428,6 +428,10 @@ const haveReplacementsChanged = useMemo(() => {
       setAddDialogOpen(false);
       setEditingReplacement(null);
       editSourceRef.current = null;
+      
+      playerRef.current?.updateSelection(null);
+      playerRef.current?.setTime(0);
+      playerRef.current?.resetZoom();
     } catch {
       // save/update failed — dialog stays open
     } finally {
@@ -539,8 +543,7 @@ const haveReplacementsChanged = useMemo(() => {
 
   const renderReplacements = async () => {
     setConfirmRenderOpen(false);
-    if (!passageAudio) return;
-    const file = new File([passageAudio.blob], "passage.wav", { type: passageAudio.blob.type });
+    const file = new File([sourceBlob!], "passage.wav", { type: sourceBlob!.type });
     setIsBusy(true);
     try {
       const base64String = await toBase64(file);
@@ -579,7 +582,7 @@ const haveReplacementsChanged = useMemo(() => {
     setIsBusy(true);
     const { version } = await createPassageVersion(
       token!, passageId, renderedBlob,
-      { renderSource: passageVersion?.audioKey, activate: true, note: versionNote },
+      { renderSource: activeVersion.renderSource ?? activeVersion.audioKey, activate: true, note: versionNote },
     );
     await associateReplacementsWithVersion(token!, passageId, version.id);
     setIsBusy(false);
@@ -604,9 +607,8 @@ const haveReplacementsChanged = useMemo(() => {
   };
 
   const handleEditClick = async (r: Replacement) => {
-    if (!passageAudio) return;
     const otherReplacements = replacements.filter((rep) => rep.id !== r.id);
-    editSourceRef.current = await composeReplacements(passageAudio.blob, otherReplacements);
+    editSourceRef.current = await composeReplacements(sourceBlob!, otherReplacements);
     // Selection in edit-excluded composed audio time
     setSelection({
       start: originalToComposedTime(r.selection.start, editSourceRef.current.offsetMap),
@@ -775,7 +777,7 @@ const haveReplacementsChanged = useMemo(() => {
           audioSource={
             showRendered
               ? renderedBlob!
-              : (composedAudio ?? passageAudio?.blob ?? undefined)
+              : (composedAudio ?? sourceBlob ?? undefined)
           }
           height={80}
           enableDragSelection
@@ -1040,7 +1042,7 @@ const haveReplacementsChanged = useMemo(() => {
         <AddReplacementDialog
           open={addDialogOpen}
           originalComposedAudio={
-            editSourceRef.current?.blob ?? composedAudio ?? passageAudio!.blob
+            editSourceRef.current?.blob ?? composedAudio ?? sourceBlob!
           }
           selection={selection}
           speaker={state.speaker ?? ""}
