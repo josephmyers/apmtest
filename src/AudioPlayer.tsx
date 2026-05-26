@@ -48,12 +48,6 @@ import {
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
 
-/** A point-in-time marker on the waveform */
-export interface AudioMarker {
-  time: number;
-  color?: string;
-}
-
 export interface AudioPlayerHandle {
   /** Seek to a specific time */
   setTime: (time: number) => void;
@@ -77,8 +71,6 @@ export interface AudioPlayerProps {
 
   /** Allow user to drag-create a selection on the waveform */
   enableDragSelection?: boolean;
-  /** Fired when a marker is clicked (receives the marker's time) */
-  onMarkerClick?: (time: number) => void;
 
   /** WaveSurfer waveColor (default: '#9fc5e8') */
   waveColor?: string;
@@ -95,6 +87,8 @@ export interface AudioPlayerProps {
   onReady?: (duration: number) => void;
   /** Called when a recording completes (provides the recorded Blob) */
   onRecordingComplete?: (blob: Blob) => void;
+  /** Called when playback starts or stops */
+  onPlayingChange?: (playing: boolean) => void;
 
   /** Menu items to show in the overflow menu (e.g. <MenuItem> elements) */
   menuItems?: React.ReactNode;
@@ -147,7 +141,6 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
     {
       audioSource,
       enableDragSelection = false,
-      onMarkerClick,
       waveColor = "#9fc5e8",
       progressColor = "#9fc5e8",
       height = 80,
@@ -164,6 +157,7 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
       stickySelection,
       shouldStopAfterStickySelection = true,
       onRecordingComplete,
+      onPlayingChange,
       onAudioChange,
       highlights = [],
       enableZoom = true,
@@ -234,7 +228,6 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
     }, [highlights]);
 
     // Stable callback refs so WaveSurfer listeners never go stale
-    const onMarkerClickRef = useRef(onMarkerClick);
     const onTimeUpdateRef = useRef(onTimeUpdate);
     const onReadyRef = useRef(onReady);
     useEffect(() => {
@@ -242,9 +235,6 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
         setInternalAudio(audioSource);
       }
     }, [audioSource]);
-    useEffect(() => {
-      onMarkerClickRef.current = onMarkerClick;
-    }, [onMarkerClick]);
     useEffect(() => {
       onTimeUpdateRef.current = onTimeUpdate;
     }, [onTimeUpdate]);
@@ -255,6 +245,10 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
     useEffect(() => {
       onRecordingCompleteRef.current = onRecordingComplete;
     }, [onRecordingComplete]);
+    const onPlayingChangeRef = useRef(onPlayingChange);
+    useEffect(() => {
+      onPlayingChangeRef.current = onPlayingChange;
+    }, [onPlayingChange]);
     const onSelectionChangeRef = useRef(onSelectionChange);
     useEffect(() => {
       onSelectionChangeRef.current = onSelectionChange;
@@ -514,24 +508,8 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
       });
 
       // --- Waveform click ---
-      ws.on("click", (relativeX) => {
-        const waveformWidth = containerRef.current?.clientWidth || 1;
-        const audioDuration = ws.getDuration() || 1;
-        const clickTime = relativeX * audioDuration;
-        const TOLERANCE_PX = 4;
-        const toleranceSec = (TOLERANCE_PX / waveformWidth) * audioDuration;
-
-        // Check if click is near a marker
-        const clickedMarker = wsRegions
-          .getRegions()
-          .find(
-            (r) =>
-              r.start === r.end &&
-              Math.abs(clickTime - r.start) <= toleranceSec,
-          );
-        if (clickedMarker) {
-          onMarkerClickRef.current?.(clickedMarker.start);
-        } else if (!isSelectionSticky) {
+      ws.on("click", () => {
+        if (!isSelectionSticky) {
           // Clear selection regions (but not when initialSelection is set)
           wsRegions.getRegions().forEach((r) => {
             if (r.start !== r.end) r.remove();
@@ -555,7 +533,6 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
         if (
           ws.isPlaying() &&
           sel &&
-          sel.start !== sel.end &&
           time >= sel.end
         ) {
           ws.pause();
@@ -582,11 +559,12 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
         });
 
         const prevSelection = selectionRef.current;
-        if (prevSelection && prevSelection.start !== prevSelection.end) {
+        if (prevSelection) {
           programmaticRef.current = true;
           regionsRef.current.addRegion({
             start: prevSelection.start,
             end: prevSelection.end,
+            color: prevSelection.start === prevSelection.end ? "#303030aa" : undefined
           });
           programmaticRef.current = false;
           ws.setTime(prevSelection.start);
@@ -615,21 +593,9 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
       return () => URL.revokeObjectURL(url);
     }, [internalAudio]);
 
-    /* ----- Sync initial selection → RegionsPlugin ----- */
+    /* ----- Sync sticky selection → selection ----- */
     useEffect(() => {
-      const rp = regionsRef.current;
-      if (!rp || !stickySelection) return;
-      // Clear existing non-marker regions
-      rp.getRegions().forEach((r) => {
-        if (r.start !== r.end) r.remove();
-      });
-      programmaticRef.current = true;
-      rp.addRegion({
-        id: "initial-selection",
-        start: stickySelection.start,
-        end: stickySelection.end,
-      });
-      programmaticRef.current = false;
+      if (!stickySelection) return;
       setSelection({
         start: stickySelection.start,
         end: stickySelection.end,
@@ -652,6 +618,7 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
       const ws = wsRef.current;
       if (!ws) return;
       playing ? ws.play() : ws.pause();
+      onPlayingChangeRef.current?.(playing);
     }, [playing]);
 
     /* ----- Render ----- */
@@ -786,8 +753,7 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
           <Typography variant="body2" sx={{ ml: "12px !important" }}>
             {timeText}
           </Typography>
-          <Box sx={{ flexGrow: 1 }} />
-          {topRowLabel}
+          {topRowLabel ?? <Box sx={{ flexGrow: 1 }} />}
           {showUndo && undoStack.length > 0 && (
             <IconButton
               disabled={undoStack.length === 0}
