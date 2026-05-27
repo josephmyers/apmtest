@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import {
   Box,
   Button,
-  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
@@ -13,7 +12,6 @@ import {
   Stack,
   TextField,
 } from "@mui/material";
-import StopIcon from "@mui/icons-material/Stop";
 import CloudUploadOutlinedIcon from "@mui/icons-material/CloudUploadOutlined";
 import { AudioPlayer, type AudioPlayerHandle } from "./AudioPlayer";
 import { formatTime } from "./formatTime";
@@ -50,35 +48,14 @@ export default function AddQuestionDialog({
   const [title, setTitle] = useState("");
   const [name, setName] = useState(initialName);
   const [questionAudio, setQuestionAudio] = useState<Blob | null>(null);
-  const [recording, setRecording] = useState(false);
-  const [warmingUp, setWarmingUp] = useState(false);
 
   useEffect(() => {
     if (open) {
       setTitle("");
       setName(initialName);
       setQuestionAudio(null);
-      setRecording(false);
-      setWarmingUp(false);
     }
   }, [open]);
-
-  const handleRecordToggle = async () => {
-    if (warmingUp) return;
-    if (!recording) {
-      try {
-        setWarmingUp(true);
-        await questionPlayerRef.current?.startRecording();
-        setWarmingUp(false);
-        setRecording(true);
-      } catch {
-        setWarmingUp(false);
-      }
-    } else {
-      questionPlayerRef.current?.stopRecording();
-      setRecording(false);
-    }
-  };
 
   const handleSubmit = (e: React.SyntheticEvent) => {
     e.preventDefault();
@@ -90,7 +67,7 @@ export default function AddQuestionDialog({
     });
   };
 
-  const canContinue = Boolean(title.trim()) && Boolean(questionAudio) && !recording && !warmingUp;
+  const canContinue = Boolean(questionAudio);
 
   return (
     <Dialog
@@ -118,13 +95,15 @@ export default function AddQuestionDialog({
           }
         />
 
-        <Box sx={{ mt: 2 }}>
+        <Box sx={{ mt: 8 }}>
           <AudioPlayer
             ref={questionPlayerRef}
             audioSource={questionAudio ?? undefined}
             height={60}
             enableZoom={false}
+            showRecordButton
             showTrash
+            showUndo={false}
             formatTimeDisplay={(currentTime, duration) =>
               `${formatTime(currentTime)}/${formatTime(duration || 0)}`
             }
@@ -140,14 +119,12 @@ export default function AddQuestionDialog({
             topRowLabel={
               <Stack
                 direction="row"
-                spacing={1}
                 alignItems="center"
-                sx={{ flex: 1, ml: 1 }}
+                sx={{ flex: 1, ml: 2 }}
               >
                 <TextField
                   name="title"
                   placeholder="Question 1"
-                  required
                   value={title}
                   onChange={(e) => {
                     setTitle(e.target.value);
@@ -179,32 +156,6 @@ export default function AddQuestionDialog({
           size="small"
           sx={{ mt: 1, maxWidth: "120px" }}
         />
-
-        {/* ─── Big record button ─────────────────────────────── */}
-        <Box sx={{ display: "flex", justifyContent: "center", mt: 3 }}>
-          <Box
-            onClick={handleRecordToggle}
-            sx={{
-              width: 80,
-              height: 80,
-              borderRadius: "50%",
-              border: recording || warmingUp ? "none" : "25px solid",
-              borderColor: "alert.main",
-              bgcolor: recording || warmingUp ? "alert.main" : "transparent",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: warmingUp ? "default" : "pointer",
-              transition: "all 0.2s ease",
-              "&:hover": warmingUp ? {} : { opacity: 0.85 },
-            }}
-          >
-            {warmingUp && <CircularProgress size={32} sx={{ color: "#fff" }} />}
-            {recording && !warmingUp && (
-              <StopIcon sx={{ color: "#fff", fontSize: 36 }} />
-            )}
-          </Box>
-        </Box>
       </DialogContent>
 
       <DialogActions>
