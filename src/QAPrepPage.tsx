@@ -171,17 +171,7 @@ function QAPrepPageInner() {
         racetrack
       />
 
-      <Box
-        sx={{
-          flex: 1,
-          display: "flex",
-          flexDirection: "column",
-          overflow: "auto",
-          position: "relative",
-          px: 2,
-          pt: 2,
-        }}
-      >
+      <Box sx={{ px: 2, pt: 2, pb: 1, flexShrink: 0 }}>
         <AudioPlayer
           ref={playerRef}
           audioSource={passageAudio?.blob ?? undefined}
@@ -202,7 +192,18 @@ function QAPrepPageInner() {
             if (p) setPlayingAudio(null);
           }}
         />
+      </Box>
 
+      <Box
+        sx={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          overflow: "auto",
+          position: "relative",
+          px: 2,
+        }}
+      >
         <List dense disablePadding sx={{ mt: 1 }}>
           {questions.map((q, i) => {
             const isMarker = q.selectionStart === q.selectionEnd;
