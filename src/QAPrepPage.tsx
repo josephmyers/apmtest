@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   Backdrop,
@@ -50,6 +50,13 @@ export default function QAPrepPage() {
   );
 }
 
+interface QuestionGroup {
+  key: string; // `${start}_${end}`
+  start: number;
+  end: number;
+  questions: Question[];
+}
+
 function QAPrepPageInner() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -67,12 +74,27 @@ function QAPrepPageInner() {
   const [playing, setPlaying] = useState(false);
   const [addQuestionOpen, setAddQuestionOpen] = useState(false);
   const [questions, setQuestions] = useState<Question[]>([]);
-  const [expandedQuestionId, setExpandedQuestionId] = useState<number | null>(null);
+  const [expandedGroupKey, setExpandedGroupKey] = useState<string | null>(null);
   const [playingAudio, setPlayingAudio] = useState<{
     id: number;
     audio: HTMLAudioElement;
     url: string;
   } | null>(null);
+
+  // Grouped view of `questions`. Display-only.
+  const groups = useMemo<QuestionGroup[]>(() => {
+    const map = new Map<string, QuestionGroup>();
+    for (const q of questions) {
+      const key = `${q.selectionStart}_${q.selectionEnd}`;
+      let g = map.get(key);
+      if (!g) {
+        g = { key, start: q.selectionStart, end: q.selectionEnd, questions: [] };
+        map.set(key, g);
+      }
+      g.questions.push(q);
+    }
+    return [...map.values()].sort((a, b) => a.start - b.start || a.end - b.end);
+  }, [questions]);
 
   useEffect(() => {
     if (!token || !passage) return;
@@ -103,32 +125,30 @@ function QAPrepPageInner() {
     };
   }, [playingAudio]);
 
-  // Collapse question if play moves outside it.
+  // Collapse the row if play moves outside it.
   useEffect(() => {
-    // If the expanded question is a range and the time is still inside it, leave it.
-    const expanded = questions.find((x) => x.id === expandedQuestionId);
+    // If the expanded row is a range and the time is still inside it, leave it.
+    const expanded = groups.find((g) => g.key === expandedGroupKey);
     if (
       expanded &&
-      expanded.selectionStart !== expanded.selectionEnd &&
-      currentTime >= expanded.selectionStart &&
-      currentTime <= expanded.selectionEnd
+      expanded.start !== expanded.end &&
+      currentTime >= expanded.start &&
+      currentTime <= expanded.end
     ) {
       return;
     }
-    const q = questions.find(
-      (x) => Math.abs(currentTime - x.selectionStart) <= 0.1,
-    );
-    if (!q) setExpandedQuestionId(null);
-  }, [currentTime, expandedQuestionId, questions]);
+    const near = groups.some((g) => Math.abs(currentTime - g.start) <= 0.1);
+    if (!near) setExpandedGroupKey(null);
+  }, [currentTime, expandedGroupKey, groups]);
 
-  const selectQuestion = (q: Question) => {
+  const selectGroup = (group: QuestionGroup) => {
     setPlayingAudio(null);
-    setExpandedQuestionId(q.id);
-    if (q.selectionStart !== q.selectionEnd) {
-      playerRef.current?.updateSelection({ start: q.selectionStart, end: q.selectionEnd });
+    setExpandedGroupKey(group.key);
+    if (group.start !== group.end) {
+      playerRef.current?.updateSelection({ start: group.start, end: group.end });
     } else {
       playerRef.current?.updateSelection(null);
-      playerRef.current?.setTime(q.selectionStart);
+      playerRef.current?.setTime(group.start);
     }
   };
 
@@ -141,11 +161,9 @@ function QAPrepPageInner() {
     setPlayingAudio({ id: q.id, audio, url });
   };
 
-  // Where the playhead falls in the sorted question list — the Add Question
-  // button sits at this index so it appears between the surrounding questions.
-  const addButtonIndex = questions.filter(
-    (q) => q.selectionStart <= currentTime,
-  ).length;
+  // Where the playhead falls in the sorted group list — the Add Question
+  // button sits at this index so it appears between the surrounding groups.
+  const addButtonIndex = groups.filter((g) => g.start <= currentTime).length;
 
   const addQuestionButton = (
     <>
@@ -198,12 +216,12 @@ function QAPrepPageInner() {
           audioSource={passageAudio?.blob ?? undefined}
           height={80}
           enableDragSelection
-          markers={questions.map((q) => q.selectionStart)}
+          markers={[...new Set(groups.map((g) => g.start))]}
           onWaveformClick={(_time, marker) => {
             if (marker === undefined) return;
-            const q = questions.find((q) => q.selectionStart === marker);
-            if (!q) return;
-            selectQuestion(q);
+            const g = groups.find((g) => g.start === marker);
+            if (!g) return;
+            selectGroup(g);
           }}
           onTimeUpdate={setCurrentTime}
           onSelectionChange={setSelection}
@@ -217,84 +235,107 @@ function QAPrepPageInner() {
       <Box
         sx={{
           flex: 1,
+          minHeight: 0,
+          position: "relative",
           display: "flex",
           flexDirection: "column",
-          overflow: "auto",
-          position: "relative",
-          px: 2,
         }}
       >
-        <List dense disablePadding sx={{ mt: 1 }}>
-          {questions.map((q, i) => {
-            const isMarker = q.selectionStart === q.selectionEnd;
-            const expanded = expandedQuestionId === q.id;
-            return (
-              <Fragment key={q.id}>
-                {!expandedQuestionId && i === addButtonIndex && addQuestionButton}
-                <Paper
-                  elevation={1}
-                  sx={{
-                    mb: 2,
-                    borderRadius: 1,
-                    overflow: "hidden",
-                    py: 0.5
-                  }}
-                >
-                  <ListItemButton
-                    disabled={expanded}
-                    sx={{opacity: "1 !important"}}
-                    onClick={() => selectQuestion(q)}
+        <Box
+          sx={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            overflow: "auto",
+            px: 2,
+          }}
+        >
+          <List dense disablePadding sx={{ mt: 1 }}>
+            {groups.map((group, i) => {
+              const isMarker = group.start === group.end;
+              const expanded = expandedGroupKey === group.key;
+              return (
+                <Fragment key={group.key}>
+                  {!expandedGroupKey && i === addButtonIndex && addQuestionButton}
+                  <Paper
+                    elevation={1}
+                    sx={{
+                      mb: 2,
+                      borderRadius: 1,
+                      overflow: "hidden",
+                      py: 0.5,
+                      bgcolor: expanded ? "#9fc5e822" : undefined
+                    }}
                   >
-                    <Typography variant="body2" sx={{ flex: 1 }}>
-                      {isMarker
-                        ? formatTime(q.selectionStart)
-                        : `${formatTime(q.selectionStart)} – ${formatTime(q.selectionEnd)}`}
-                    </Typography>
-                    {!expanded && <ExpandMoreIcon fontSize="small" />}
-                  </ListItemButton>
-                  <Collapse in={expanded} unmountOnExit>
-                    <Stack
-                      direction="row"
-                      alignItems="center"
-                      spacing={1}
-                      sx={{ px: 2, py: 1 }}
+                    <ListItemButton
+                      disabled={expanded}
+                      sx={{opacity: "1 !important"}}
+                      onClick={() => selectGroup(group)}
                     >
-                      <IconButton
-                        size="small"
-                        onClick={() =>
-                          playingAudio?.id === q.id
-                            ? setPlayingAudio(null)
-                            : playQuestionAudio(q)
-                        }
-                      >
-                        {playingAudio?.id === q.id ? (
-                          <StopIcon />
-                        ) : (
-                          <PlayArrowIcon />
-                        )}
-                      </IconButton>
                       <Typography variant="body2" sx={{ flex: 1 }}>
-                        {q.title}
+                        {isMarker
+                          ? formatTime(group.start)
+                          : `${formatTime(group.start)} – ${formatTime(group.end)}`}
                       </Typography>
-                    </Stack>
-                  </Collapse>
-                </Paper>
-              </Fragment>
-            );
-          })}
-          {!expandedQuestionId &&
-            addButtonIndex === questions.length &&
-            addQuestionButton}
-        </List>
+                      {!expanded && <ExpandMoreIcon fontSize="small" />}
+                    </ListItemButton>
+                    <Collapse in={expanded} unmountOnExit>
+                      {group.questions.map((q) => (
+                        <Stack
+                          key={q.id}
+                          direction="row"
+                          alignItems="center"
+                          spacing={1}
+                          sx={{ px: 2, py: 1 }}
+                        >
+                          <IconButton
+                            size="small"
+                            onClick={() =>
+                              playingAudio?.id === q.id
+                                ? setPlayingAudio(null)
+                                : playQuestionAudio(q)
+                            }
+                          >
+                            {playingAudio?.id === q.id ? (
+                              <StopIcon />
+                            ) : (
+                              <PlayArrowIcon />
+                            )}
+                          </IconButton>
+                          <Typography variant="body2" sx={{ flex: 1 }}>
+                            {q.title}
+                          </Typography>
+                        </Stack>
+                      ))}
+                      <Box sx={{ px: 2, py: 1 }}>
+                        <Button
+                          fullWidth
+                          startIcon={<AddIcon />}
+                          disabled={playing || !passageAudio}
+                          onClick={() => setAddQuestionOpen(true)}
+                        >
+                          Add Question...
+                        </Button>
+                      </Box>
+                    </Collapse>
+                  </Paper>
+                </Fragment>
+              );
+            })}
+            {!expandedGroupKey &&
+              addButtonIndex === groups.length &&
+              addQuestionButton}
+          </List>
 
-        {questions.length === 0 && !expandedQuestionId && (
-          <Box sx={{ textAlign: "center", mt: 6, px: 2 }}>
-            <Typography variant="body2">
-              Tap + to add a question here. Drag to select a range, or
-              double-tap to select all.
-            </Typography>
-          </Box>
-        )}
+          {questions.length === 0 && !expandedGroupKey && (
+            <Box sx={{ textAlign: "center", mt: 6, px: 2 }}>
+              <Typography variant="body2">
+                Tap + to add a question here. Drag to select a range, or
+                double-tap to select all.
+              </Typography>
+            </Box>
+          )}
+        </Box>
 
         <IconButton
           variant="floating"
