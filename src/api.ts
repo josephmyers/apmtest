@@ -622,6 +622,77 @@ export async function deleteReplacement(
   return data;
 }
 
+export interface Question {
+  id: number;
+  title: string;
+  name: string;
+  selectionStart: number;
+  selectionEnd: number;
+  audio: Blob;
+}
+
+export async function saveQuestion(
+  token: string,
+  passageId: number,
+  title: string,
+  name: string,
+  selectionStart: number,
+  selectionEnd: number,
+  audioBlob: Blob,
+): Promise<Question> {
+  const params = new URLSearchParams({
+    passageId: String(passageId),
+    title,
+    name,
+    selectionStart: String(selectionStart),
+    selectionEnd: String(selectionEnd),
+  });
+  const res = await fetch(`${API_BASE}/questions?${params}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: audioBlob,
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Failed to save question");
+  return { ...data.question, audio: audioBlob };
+}
+
+export async function getQuestions(
+  token: string,
+  passageId: number,
+): Promise<Question[]> {
+  const res = await fetch(
+    `${API_BASE}/questions?passageId=${passageId}`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  const data = (await res.json()) as {
+    questions: Omit<Question, "audio">[];
+  };
+  if (!res.ok) throw new Error("Failed to fetch questions");
+  return Promise.all(
+    data.questions.map(async (q) => ({
+      ...q,
+      audio: (await fetchQuestionAudio(token, q.id))!,
+    })),
+  );
+}
+
+export async function fetchQuestionAudio(
+  token: string,
+  questionId: number,
+): Promise<Blob | null> {
+  const res = await fetch(
+    `${API_BASE}/questions?id=${questionId}&audio=1`,
+    {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    },
+  );
+  if (res.status === 404) return null;
+  if (!res.ok) return null;
+  return await res.blob();
+}
+
 export async function deleteUnversionedReplacements(
   token: string,
   passageId: number,

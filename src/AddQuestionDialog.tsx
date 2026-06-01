@@ -23,6 +23,8 @@ interface AddQuestionDialogProps {
   /** Range or play-marker imported from the parent.
    *  When no range is selected on the parent, start === end (a marker). */
   selection: { start: number; end: number };
+  /** Default title to seed (and submit) if the user doesn't type one */
+  initialTitle: string;
   /** Default name to seed the Name field with */
   initialName?: string;
   onCancel: () => void;
@@ -38,6 +40,7 @@ export default function AddQuestionDialog({
   open,
   passageAudio,
   selection,
+  initialTitle,
   initialName = "",
   onCancel,
   onContinue,
@@ -45,24 +48,26 @@ export default function AddQuestionDialog({
   const questionPlayerRef = useRef<AudioPlayerHandle>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [title, setTitle] = useState("");
+  const [title, setTitle] = useState(initialTitle);
   const [name, setName] = useState(initialName);
   const [questionAudio, setQuestionAudio] = useState<Blob | null>(null);
+  const [currentSelection, setCurrentSelection] = useState(selection);
 
   useEffect(() => {
     if (open) {
-      setTitle("");
+      setTitle(initialTitle);
       setName(initialName);
       setQuestionAudio(null);
+      setCurrentSelection(selection);
     }
   }, [open]);
 
   const handleSubmit = (e: React.SyntheticEvent) => {
     e.preventDefault();
     onContinue({
-      title: title.trim(),
+      title: title.trim() || initialTitle,
       name: name.trim(),
-      selection,
+      selection: currentSelection,
       audio: questionAudio!,
     });
   };
@@ -88,8 +93,13 @@ export default function AddQuestionDialog({
         <AudioPlayer
           audioSource={passageAudio}
           height={60}
-          stickySelection={selection}
-          shouldStopAfterStickySelection={selection.start !== selection.end}
+          stickySelection={currentSelection}
+          shouldStopAfterStickySelection={
+            currentSelection.start !== currentSelection.end
+          }
+          onSelectionChange={(sel) => {
+            setCurrentSelection(sel!);
+          }}
           formatTimeDisplay={(currentTime, duration) =>
             `${formatTime(currentTime)}/${formatTime(duration || 0)}`
           }
@@ -124,7 +134,7 @@ export default function AddQuestionDialog({
               >
                 <TextField
                   name="title"
-                  placeholder="Question 1"
+                  placeholder={initialTitle}
                   value={title}
                   onChange={(e) => {
                     setTitle(e.target.value);

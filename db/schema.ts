@@ -70,3 +70,14 @@ export const replacements = pgTable('replacements', {
     versionId: integer('version_id').references(() => passageVersions.id, { onDelete: 'set null' }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 });
+
+export const questions = pgTable('questions', {
+    id: serial('id').primaryKey(),
+    passageId: integer('passage_id').notNull().references(() => passages.id, { onDelete: 'cascade' }),
+    title: varchar('title', { length: 255 }).notNull(),
+    name: varchar('name', { length: 255 }).notNull().default(''),
+    selectionStart: doublePrecision('selection_start').notNull(),
+    selectionEnd: doublePrecision('selection_end').notNull(),
+    audioKey: varchar('audio_key', { length: 255 }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+});

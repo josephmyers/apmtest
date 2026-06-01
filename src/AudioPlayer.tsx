@@ -130,6 +130,45 @@ export interface AudioPlayerProps {
 
   /** Optional label rendered on the top row (after time display) */
   topRowLabel?: React.ReactNode;
+
+  /** Static markers (timestamps in seconds). */
+  markers?: number[];
+
+  /** Fires on every waveform click. `marker` is the nearest marker timestamp within ~10px, if any. */
+  onWaveformClick?: (timestamp: number, marker?: number) => void;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Marker click helpers                                               */
+/* ------------------------------------------------------------------ */
+
+const GRACE_PX = 10;
+
+function graceSec(ws: WaveSurfer, container: HTMLDivElement | null): number {
+  const dur = ws.getDuration();
+  if (!dur) return 0;
+  const pxPerSec =
+    ws.options.minPxPerSec > 0
+      ? ws.options.minPxPerSec
+      : (container?.clientWidth ?? 0) / dur;
+  return pxPerSec > 0 ? GRACE_PX / pxPerSec : 0;
+}
+
+function nearestMarkerWithin(
+  markers: number[],
+  t: number,
+  grace: number,
+): number | undefined {
+  let best: number | undefined;
+  let bestD = Infinity;
+  for (const m of markers) {
+    const d = Math.abs(m - t);
+    if (d <= grace && d < bestD) {
+      best = m;
+      bestD = d;
+    }
+  }
+  return best;
 }
 
 /* ------------------------------------------------------------------ */
@@ -163,6 +202,8 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
       enableZoom = true,
       children,
       topRowLabel,
+      markers,
+      onWaveformClick,
     },
     ref,
   ) => {
@@ -226,6 +267,10 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
     useEffect(() => {
       highlightsRef.current = highlights;
     }, [highlights]);
+    const markersRef = useRef(markers);
+    useEffect(() => {
+      markersRef.current = markers;
+    }, [markers]);
 
     // Stable callback refs so WaveSurfer listeners never go stale
     const onTimeUpdateRef = useRef(onTimeUpdate);
@@ -494,7 +539,6 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
       });
 
       wsRegions.on("region-updated", (region) => {
-        if (region.start === region.end) return;
         const sel = { start: region.start, end: region.end };
         setSelection(sel);
         fireSelectionChange(sel, "user");
@@ -555,9 +599,10 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
 
         // Clear any pre-existing regions
         regionsRef.current.getRegions().forEach((r) => {
-          if (r.start !== r.end) r.remove();
+          r.remove();
         });
 
+        // Preserve previous selection
         const prevSelection = selectionRef.current;
         if (prevSelection) {
           programmaticRef.current = true;
@@ -568,6 +613,16 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
           });
           programmaticRef.current = false;
           ws.setTime(prevSelection.start);
+        }
+
+        // Re-add static markers
+        for (const t of markersRef.current ?? []) {
+          regionsRef.current.addRegion({
+            start: t,
+            drag: false,
+            resize: false,
+            color: "#303030aa",
+          });
         }
       });
       ws.on("finish", () => setPlaying(false));
@@ -609,6 +664,36 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
       if (!ws || !duration) return;
       ws.setOptions({});
     }, [selection, duration, waveColor, highlights]);
+
+    /* ----- Sync static markers when the prop changes during runtime ----- */
+    useEffect(() => {
+      const rp = regionsRef.current;
+      const ws = wsRef.current;
+      if (!rp || !ws || !ws.getDuration()) return;
+      rp.getRegions().forEach((r) => {
+        if (r.end === r.start) r.remove();
+      });
+      for (const t of markers ?? []) {
+        rp.addRegion({ start: t, drag: false, resize: false, color: "#303030aa" });
+      }
+      // Keyed on marker values, not array identity.
+    }, [(markers ?? []).join(",")]);
+
+    /* ----- Fire onWaveformClick (alongside the click handler) ----- */
+    useEffect(() => {
+      if (!onWaveformClick) return;
+      const ws = wsRef.current;
+      if (!ws) return;
+      return ws.on("click", (relX: number) => {
+        const t = relX * ws.getDuration();
+        const marker = nearestMarkerWithin(
+          markersRef.current ?? [],
+          t,
+          graceSec(ws, containerRef.current),
+        );
+        onWaveformClick(t, marker);
+      });
+    }, [onWaveformClick]);
 
     // Drive `duration` from a stopwatch while recording
     useStopwatch(isRecording, (t) => setDuration(t));
@@ -713,7 +798,7 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
           {/* Left button: Record/Stop when showRecordButton and no audio (or warming up / actively recording), otherwise Play/Pause */}
           {showRecordButton && (!hasLoadedAudio || isRecording || warmingUp) ? (
             warmingUp ? (
-              <IconButton disabled sx={{ p: 0 }} aria-label="warming up">
+              <IconButton disabled sx={{ p: 0, px: "5.5px" }} aria-label="warming up">
                 <CircularProgress size={24} />
               </IconButton>
             ) : isRecording ? (

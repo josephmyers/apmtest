@@ -159,6 +159,9 @@ export async function deleteAudioBlobsForPassages(
   const replacementRows = await sql`
     SELECT audio_key FROM replacements WHERE passage_id = ANY(${passageIds})
   `;
+  const questionRows = await sql`
+    SELECT audio_key FROM questions WHERE passage_id = ANY(${passageIds})
+  `;
 
   const keys = new Set<string>();
   for (const r of passageRows) {
@@ -167,6 +170,7 @@ export async function deleteAudioBlobsForPassages(
   }
   for (const r of versionRows) if (r.audio_key) keys.add(r.audio_key as string);
   for (const r of replacementRows) if (r.audio_key) keys.add(r.audio_key as string);
+  for (const r of questionRows) if (r.audio_key) keys.add(r.audio_key as string);
 
   await Promise.all(
     Array.from(keys).map((k) =>
