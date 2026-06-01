@@ -103,13 +103,34 @@ function QAPrepPageInner() {
     };
   }, [playingAudio]);
 
-  // Expand the first question whose start matches the playhead; collapse otherwise.
+  // Collapse question if play moves outside it.
   useEffect(() => {
+    // If the expanded question is a range and the time is still inside it, leave it.
+    const expanded = questions.find((x) => x.id === expandedQuestionId);
+    if (
+      expanded &&
+      expanded.selectionStart !== expanded.selectionEnd &&
+      currentTime >= expanded.selectionStart &&
+      currentTime <= expanded.selectionEnd
+    ) {
+      return;
+    }
     const q = questions.find(
       (x) => Math.abs(currentTime - x.selectionStart) <= 0.1,
     );
-    setExpandedQuestionId(q?.id ?? null);
-  }, [currentTime, questions]);
+    if (!q) setExpandedQuestionId(null);
+  }, [currentTime, expandedQuestionId, questions]);
+
+  const selectQuestion = (q: Question) => {
+    setPlayingAudio(null);
+    setExpandedQuestionId(q.id);
+    if (q.selectionStart !== q.selectionEnd) {
+      playerRef.current?.updateSelection({ start: q.selectionStart, end: q.selectionEnd });
+    } else {
+      playerRef.current?.updateSelection(null);
+      playerRef.current?.setTime(q.selectionStart);
+    }
+  };
 
   const playQuestionAudio = (q: Question) => {
     const url = URL.createObjectURL(q.audio);
@@ -182,8 +203,7 @@ function QAPrepPageInner() {
             if (marker === undefined) return;
             const q = questions.find((q) => q.selectionStart === marker);
             if (!q) return;
-            setPlayingAudio(null);
-            playerRef.current?.setTime(q.selectionStart);
+            selectQuestion(q);
           }}
           onTimeUpdate={setCurrentTime}
           onSelectionChange={setSelection}
@@ -223,7 +243,7 @@ function QAPrepPageInner() {
                   <ListItemButton
                     disabled={expanded}
                     sx={{opacity: "1 !important"}}
-                    onClick={() => playerRef.current?.setTime(q.selectionStart)}
+                    onClick={() => selectQuestion(q)}
                   >
                     <Typography variant="body2" sx={{ flex: 1 }}>
                       {isMarker
