@@ -214,6 +214,9 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
     const recordRef = useRef<RecordPlugin | null>(null);
     const suppressDecodeRef = useRef(false);
     const dragCleanupRef = useRef<(() => void) | null>(null);
+    
+    // Time at which the current playback started.
+    const playStartTimeRef = useRef(0);
 
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
@@ -564,6 +567,9 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
       });
 
       // --- Playback events ---
+      ws.on("play", () => {
+        playStartTimeRef.current = ws.getCurrentTime();
+      });
       ws.on("timeupdate", (time) => {
         setCurrentTime(time);
         onTimeUpdateRef.current?.(time);
@@ -577,7 +583,8 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
         if (
           ws.isPlaying() &&
           sel &&
-          time >= sel.end
+          time >= sel.end &&
+          playStartTimeRef.current < sel.end
         ) {
           ws.pause();
           ws.setTime(sel.start);
