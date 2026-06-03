@@ -283,10 +283,12 @@ function QAPrepPageInner() {
                           sx={{ px: 1, py: 1 }}
                         >
                           {/* Drag handle — placeholder only, no DnD yet. */}
-                          <DragIndicatorIcon
-                            fontSize="small"
-                            sx={{ color: "text.disabled", cursor: "grab" }}
-                          />
+                          {group.questions.length > 1 && (
+                            <DragIndicatorIcon
+                              fontSize="small"
+                              sx={{ color: "text.disabled", cursor: "grab" }}
+                            />
+                          )}
                           <Box sx={{ flex: 1, minWidth: 0 }}>
                             <MiniAudioPlayer
                               audio={q.audio}
