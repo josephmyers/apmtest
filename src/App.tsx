@@ -54,7 +54,7 @@ const theme = createTheme({
       main: RECORD_READY_RED,
     },
     secondary: {
-      main: "#00A7E1",
+      main: "#9fc5e8",
     },
     neutral: {
       main: "#000000",

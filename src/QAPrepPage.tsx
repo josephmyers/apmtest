@@ -13,6 +13,7 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 import AddIcon from "@mui/icons-material/Add";
 import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
@@ -258,7 +259,9 @@ function QAPrepPageInner() {
                       borderRadius: 1,
                       overflow: "hidden",
                       py: 0.5,
-                      bgcolor: expanded ? "#9fc5e822" : undefined
+                      bgcolor: expanded
+                        ? (theme) => alpha(theme.palette.secondary.main, 0.13)
+                        : undefined
                     }}
                   >
                     <ListItemButton

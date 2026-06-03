@@ -23,6 +23,7 @@ import {
   Typography,
 } from "@mui/material";
 import PeopleOutlineIcon from "@mui/icons-material/PeopleOutline";
+import { darken } from "@mui/material/styles";
 import MenuBookIcon from "@mui/icons-material/MenuBook";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -253,8 +254,7 @@ function ProjectCard({
   return (
     <Card
       sx={{
-        bgcolor: "primary.main",
-        color: "#fff",
+        bgcolor: (theme) => darken(theme.palette.secondary.main, 0.05),
         position: "relative",
         borderRadius: 2,
       }}
@@ -276,7 +276,7 @@ function ProjectCard({
       </CardActionArea>
       <IconButton
         size="small"
-        sx={{ position: "absolute", top: 8, right: 8, color: "#fff" }}
+        sx={{ position: "absolute", top: 8, right: 8 }}
         onClick={(e) => {
           e.stopPropagation();
           setMenuAnchor(e.currentTarget);

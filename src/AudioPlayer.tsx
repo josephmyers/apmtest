@@ -74,9 +74,9 @@ export interface AudioPlayerProps {
   /** Allow user to drag-create a selection on the waveform */
   enableDragSelection?: boolean;
 
-  /** WaveSurfer waveColor (default: '#9fc5e8') */
+  /** WaveSurfer waveColor (default: theme palette `waveform.main`) */
   waveColor?: string;
-  /** WaveSurfer progressColor (default: '#9fc5e8') */
+  /** WaveSurfer progressColor (default: theme palette `waveform.main`) */
   progressColor?: string;
   /** Waveform height in px (default: 80) */
   height?: number;
@@ -182,8 +182,8 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
     {
       audioSource,
       enableDragSelection = false,
-      waveColor = "#9fc5e8",
-      progressColor = "#9fc5e8",
+      waveColor: waveColorProp,
+      progressColor: progressColorProp,
       height = 80,
       formatTimeDisplay,
       onTimeUpdate,
@@ -231,6 +231,8 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
     const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
     const [isZoomed, setIsZoomed] = useState(false);
     const theme = useTheme();
+    const waveColor = waveColorProp ?? theme.palette.secondary.main;
+    const progressColor = progressColorProp ?? theme.palette.secondary.main;
     const isSmallScreen = useMediaQuery(theme.breakpoints.down("md"));
     const isSelectionSticky = !!stickySelection;
 

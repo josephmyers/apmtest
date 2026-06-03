@@ -708,7 +708,7 @@ const haveReplacementsChanged = useMemo(() => {
           sx={{
             display: "flex",
             alignItems: "center",
-            bgcolor: "#9fc5e8",
+            bgcolor: "secondary.main",
             px: 1.5,
             py: 1,
             gap: 1,

@@ -15,6 +15,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import { darken } from "@mui/material/styles";
 import { useAuth } from "./AuthContext";
 import PageHeader from "./PageHeader";
 import { createTeam } from "./api";
@@ -86,7 +87,7 @@ export default function SwitchTeamsPage() {
                   key={t.id}
                   selected={t.id === activeTeamId}
                   onClick={() => handlePick(t.id)}
-                  sx={{ borderRadius: 2, my: 1, bgcolor: "#f5f5f5" }}
+                  sx={{ borderRadius: 2, my: 1, bgcolor: (theme) => t.id === activeTeamId ? darken(theme.palette.secondary.main, 0.05) + " !important" : "#f5f5f5" }}
                 >
                   <ListItemText
                     primary={t.name}
