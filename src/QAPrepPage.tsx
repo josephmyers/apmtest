@@ -16,8 +16,9 @@ import {
 import AddIcon from "@mui/icons-material/Add";
 import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
-import PlayArrowIcon from "@mui/icons-material/PlayArrow";
-import StopIcon from "@mui/icons-material/Stop";
+import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import { useAuth } from "./AuthContext";
 import { useSnackbar } from "./useSnackbar";
 import PageHeader from "./PageHeader";
@@ -28,11 +29,14 @@ import {
   getQuestions,
   listPassageVersions,
   saveQuestion,
+  updateQuestion,
+  deleteQuestion,
   type PassageVersion,
   type Question,
 } from "./api";
 import { type StepNavState } from "./steps";
 import { AudioPlayer, type AudioPlayerHandle } from "./AudioPlayer";
+import MiniAudioPlayer from "./MiniAudioPlayer";
 import { formatTime } from "./formatTime";
 import AddQuestionDialog from "./AddQuestionDialog";
 
@@ -66,20 +70,17 @@ function QAPrepPageInner() {
   const nav = location.state as StepNavState;
   const projectId = nav?.projectId;
 
-  const playerRef = useRef<AudioPlayerHandle>(null);
+  const passageAudioRef = useRef<AudioPlayerHandle>(null);
   const [passageAudio, setPassageAudio] = useState<{ blob: Blob; version: PassageVersion } | null>(null);
   const [audioInitialized, setAudioInitialized] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [selection, setSelection] = useState<{ start: number; end: number } | null>(null);
-  const [playing, setPlaying] = useState(false);
   const [addQuestionOpen, setAddQuestionOpen] = useState(false);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [expandedGroupKey, setExpandedGroupKey] = useState<string | null>(null);
-  const [playingAudio, setPlayingAudio] = useState<{
-    id: number;
-    audio: HTMLAudioElement;
-    url: string;
-  } | null>(null);
+  const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
+  // The audio that's currently playing
+  const [playingAudio, setPlayingAudio] = useState<Blob | null>(null);
 
   // Grouped view of `questions`. Display-only.
   const groups = useMemo<QuestionGroup[]>(() => {
@@ -114,17 +115,6 @@ function QAPrepPageInner() {
     });
   }, [token, passage]);
 
-  // Tear down a clip when it's replaced/cleared or on unmount. Setting a new
-  // playingAudio (or null) pauses and frees the previous one.
-  useEffect(() => {
-    if (!playingAudio) return;
-    const { audio, url } = playingAudio;
-    return () => {
-      audio.pause();
-      URL.revokeObjectURL(url);
-    };
-  }, [playingAudio]);
-
   // Collapse the row if play moves outside it.
   useEffect(() => {
     // If the expanded row is a range and the time is still inside it, leave it.
@@ -145,20 +135,21 @@ function QAPrepPageInner() {
     setPlayingAudio(null);
     setExpandedGroupKey(group.key);
     if (group.start !== group.end) {
-      playerRef.current?.updateSelection({ start: group.start, end: group.end });
+      passageAudioRef.current?.updateSelection({ start: group.start, end: group.end });
     } else {
-      playerRef.current?.updateSelection(null);
-      playerRef.current?.setTime(group.start);
+      passageAudioRef.current?.updateSelection(null);
+      passageAudioRef.current?.setTime(group.start);
     }
   };
 
-  const playQuestionAudio = (q: Question) => {
-    const url = URL.createObjectURL(q.audio);
-    const audio = new Audio(url);
-    audio.onended = () =>
-      setPlayingAudio((cur) => (cur?.audio === audio ? null : cur));
-    audio.play();
-    setPlayingAudio({ id: q.id, audio, url });
+  const handleDeleteQuestion = async (q: Question) => {
+    if (!token) return;
+    try {
+      await deleteQuestion(token, q.id);
+      setQuestions((prev) => prev.filter((x) => x.id !== q.id));
+    } catch (err) {
+      setSnackMsg(err instanceof Error ? err.message : "Failed to delete question");
+    }
   };
 
   // Where the playhead falls in the sorted group list — the Add Question
@@ -177,7 +168,7 @@ function QAPrepPageInner() {
       fullWidth
       startIcon={<AddIcon />}
       sx={{ mb: 2 }}
-      disabled={playing || !passageAudio}
+      disabled={!!playingAudio || !passageAudio}
       onClick={() => setAddQuestionOpen(true)}
     >
         Add Question...
@@ -212,7 +203,7 @@ function QAPrepPageInner() {
 
       <Box sx={{ px: 2, pt: 2, pb: 1, flexShrink: 0 }}>
         <AudioPlayer
-          ref={playerRef}
+          ref={passageAudioRef}
           audioSource={passageAudio?.blob ?? undefined}
           height={80}
           enableDragSelection
@@ -225,9 +216,12 @@ function QAPrepPageInner() {
           }}
           onTimeUpdate={setCurrentTime}
           onSelectionChange={setSelection}
-          onPlayingChange={(p) => {
-            setPlaying(p);
-            if (p) setPlayingAudio(null);
+          onPlayingChange={(playing) => {
+            if (playing) {
+              setPlayingAudio(passageAudio?.blob ?? null);
+            } else if (playingAudio === passageAudio?.blob) {
+              setPlayingAudio(null);
+            }
           }}
         />
       </Box>
@@ -286,32 +280,58 @@ function QAPrepPageInner() {
                           direction="row"
                           alignItems="center"
                           spacing={1}
-                          sx={{ px: 2, py: 1 }}
+                          sx={{ px: 1, py: 1 }}
                         >
+                          {/* Drag handle — placeholder only, no DnD yet. */}
+                          <DragIndicatorIcon
+                            fontSize="small"
+                            sx={{ color: "text.disabled", cursor: "grab" }}
+                          />
+                          <Box sx={{ flex: 1, minWidth: 0 }}>
+                            <MiniAudioPlayer
+                              audio={q.audio}
+                              playing={playingAudio === q.audio}
+                              onPlayingChange={(playing) => {
+                                if (playing) {
+                                  passageAudioRef.current?.pause();
+                                  setPlayingAudio(q.audio);
+                                } else {
+                                  setPlayingAudio(null);
+                                }
+                              }}
+                              label={
+                                <Stack
+                                  direction="row"
+                                  alignItems="center"
+                                  spacing={0.5}
+                                >
+                                  <Typography variant="body2" noWrap>
+                                    {q.title}
+                                  </Typography>
+                                  <IconButton
+                                    size="small"
+                                    aria-label="edit question"
+                                    onClick={() => setEditingQuestion(q)}
+                                  >
+                                    <EditOutlinedIcon fontSize="inherit" />
+                                  </IconButton>
+                                </Stack>
+                              }
+                            />
+                          </Box>
                           <IconButton
                             size="small"
-                            onClick={() =>
-                              playingAudio?.id === q.id
-                                ? setPlayingAudio(null)
-                                : playQuestionAudio(q)
-                            }
+                            onClick={() => handleDeleteQuestion(q)}
                           >
-                            {playingAudio?.id === q.id ? (
-                              <StopIcon />
-                            ) : (
-                              <PlayArrowIcon />
-                            )}
+                            <DeleteOutlineIcon fontSize="small" />
                           </IconButton>
-                          <Typography variant="body2" sx={{ flex: 1 }}>
-                            {q.title}
-                          </Typography>
                         </Stack>
                       ))}
                       <Box sx={{ px: 2, py: 1 }}>
                         <Button
                           fullWidth
                           startIcon={<AddIcon />}
-                          disabled={playing || !passageAudio}
+                          disabled={!!playingAudio || !passageAudio}
                           onClick={() => setAddQuestionOpen(true)}
                         >
                           Add Question...
@@ -379,13 +399,50 @@ function QAPrepPageInner() {
                 ),
               );
               
-              playerRef.current?.setTime(sel.start);
-              playerRef.current?.updateSelection(sel.start === sel.end ? null : sel);
-              playerRef.current?.resetZoom();
+              passageAudioRef.current?.setTime(sel.start);
+              passageAudioRef.current?.updateSelection(sel.start === sel.end ? null : sel);
+              passageAudioRef.current?.resetZoom();
 
               setAddQuestionOpen(false);
             } catch (err) {
               setSnackMsg(err instanceof Error ? err.message : "Failed to save question");
+            }
+          }}
+        />
+      )}
+
+      {editingQuestion && token && (
+        <AddQuestionDialog
+          open
+          dialogTitle="Edit Question"
+          passageAudio={passageAudio!.blob}
+          selection={{
+            start: editingQuestion.selectionStart,
+            end: editingQuestion.selectionEnd,
+          }}
+          initialTitle={editingQuestion.title}
+          initialName={editingQuestion.name}
+          initialAudio={editingQuestion.audio}
+          onCancel={() => setEditingQuestion(null)}
+          onContinue={async ({ title, name, selection: sel, audio }) => {
+            try {
+              const updated = await updateQuestion(
+                token,
+                editingQuestion.id,
+                title,
+                name,
+                sel.start,
+                sel.end,
+                audio,
+              );
+              setQuestions((prev) =>
+                prev
+                  .map((x) => (x.id === editingQuestion.id ? updated : x))
+                  .sort((a, b) => a.selectionStart - b.selectionStart),
+              );
+              setEditingQuestion(null);
+            } catch (err) {
+              setSnackMsg(err instanceof Error ? err.message : "Failed to update question");
             }
           }}
         />

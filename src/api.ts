@@ -657,6 +657,45 @@ export async function saveQuestion(
   return { ...data.question, audio: audioBlob };
 }
 
+export async function updateQuestion(
+  token: string,
+  id: number,
+  title: string,
+  name: string,
+  selectionStart: number,
+  selectionEnd: number,
+  audioBlob: Blob,
+): Promise<Question> {
+  const params = new URLSearchParams({
+    id: String(id),
+    title,
+    name,
+    selectionStart: String(selectionStart),
+    selectionEnd: String(selectionEnd),
+  });
+  const res = await fetch(`${API_BASE}/questions?${params}`, {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${token}` },
+    body: audioBlob,
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Failed to update question");
+  return { ...data.question, audio: audioBlob };
+}
+
+export async function deleteQuestion(
+  token: string,
+  id: number,
+): Promise<{ success: boolean }> {
+  const res = await fetch(`${API_BASE}/questions?id=${id}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Failed to delete question");
+  return data;
+}
+
 export async function getQuestions(
   token: string,
   passageId: number,

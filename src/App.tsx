@@ -59,9 +59,6 @@ const theme = createTheme({
     neutral: {
       main: "#000000",
     },
-    custom: {
-      currentRegion: "rgb(102, 255, 0, .5)",
-    },
   } as any,
   typography: {
     button: {
@@ -161,6 +158,14 @@ const theme = createTheme({
           "&.Mui-expanded": {
             margin: "0",
           },
+        },
+      },
+    },
+    MuiSlider: {
+      styleOverrides: {
+        root: {
+          color: "rgba(0, 0, 0, 0.7)",
+          paddingBlock: "10px !important", //overrides padding changes between mobile and desktop
         },
       },
     },

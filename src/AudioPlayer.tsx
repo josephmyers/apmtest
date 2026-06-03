@@ -51,6 +51,8 @@ import {
 export interface AudioPlayerHandle {
   /** Seek to a specific time */
   setTime: (time: number) => void;
+  /** Pause playback */
+  pause: () => void;
   /** The waveform container element (for pixel calculations) */
   container: HTMLDivElement | null;
   /** Start recording from the microphone */

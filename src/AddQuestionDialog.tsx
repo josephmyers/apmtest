@@ -27,6 +27,10 @@ interface AddQuestionDialogProps {
   initialTitle: string;
   /** Default name to seed the Name field with */
   initialName?: string;
+  /** Existing recording to seed (edit mode); when set, Continue is enabled immediately */
+  initialAudio?: Blob;
+  /** Dialog heading (default: "Add Question") */
+  dialogTitle?: string;
   onCancel: () => void;
   onContinue: (data: {
     title: string;
@@ -42,6 +46,8 @@ export default function AddQuestionDialog({
   selection,
   initialTitle,
   initialName = "",
+  initialAudio,
+  dialogTitle = "Add Question",
   onCancel,
   onContinue,
 }: AddQuestionDialogProps) {
@@ -50,14 +56,16 @@ export default function AddQuestionDialog({
 
   const [title, setTitle] = useState(initialTitle);
   const [name, setName] = useState(initialName);
-  const [questionAudio, setQuestionAudio] = useState<Blob | null>(null);
+  const [questionAudio, setQuestionAudio] = useState<Blob | null>(
+    initialAudio ?? null,
+  );
   const [currentSelection, setCurrentSelection] = useState(selection);
 
   useEffect(() => {
     if (open) {
       setTitle(initialTitle);
       setName(initialName);
-      setQuestionAudio(null);
+      setQuestionAudio(initialAudio ?? null);
       setCurrentSelection(selection);
     }
   }, [open]);
@@ -88,7 +96,7 @@ export default function AddQuestionDialog({
         },
       }}
     >
-      <DialogTitle sx={{px: 2}}>Add Question</DialogTitle>
+      <DialogTitle sx={{px: 2}}>{dialogTitle}</DialogTitle>
       <DialogContent sx={{px: 2}}>
         <AudioPlayer
           audioSource={passageAudio}

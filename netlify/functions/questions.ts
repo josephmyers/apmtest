@@ -90,5 +90,58 @@ export default handle(async (req: Request) => {
     });
   }
 
+  // PUT /questions?id=N&title=...&name=...&selectionStart=...&selectionEnd=...
+  // Body: optional replacement audio blob
+  if (method === "PUT") {
+    const id = Number(url.searchParams.get("id"));
+    if (!id) throw new HttpError(400, "id is required");
+
+    const existing = await sql`SELECT passage_id FROM questions WHERE id = ${id}`;
+    if (existing.length === 0) throw new HttpError(404, "Question not found");
+    await assertPassageAccess(sql, user.userId, existing[0].passage_id as number);
+
+    const title = url.searchParams.get("title") || "";
+    const name = url.searchParams.get("name") || "";
+    const selectionStart = Number(url.searchParams.get("selectionStart"));
+    const selectionEnd = Number(url.searchParams.get("selectionEnd"));
+
+    // Store the new recording first (if any) so audio_key can be set in the
+    // same UPDATE. COALESCE leaves the existing key when no audio is sent.
+    const body = await req.arrayBuffer();
+    let audioKey: string | null = null;
+    if (body && body.byteLength > 0) {
+      audioKey = `question-${id}.mp3`;
+      await store.set(audioKey, body as ArrayBuffer, {
+        metadata: { questionId: String(id), uploadedBy: String(user.userId) },
+      });
+    }
+
+    await sql`
+      UPDATE questions
+      SET title = ${title}, name = ${name},
+          selection_start = ${selectionStart}, selection_end = ${selectionEnd},
+          audio_key = COALESCE(${audioKey}::text, audio_key)
+      WHERE id = ${id}
+    `;
+
+    return jsonRes({
+      question: { id, title, name, selectionStart, selectionEnd },
+    });
+  }
+
+  // DELETE /questions?id=N
+  if (method === "DELETE") {
+    const id = Number(url.searchParams.get("id"));
+    if (!id) throw new HttpError(400, "id is required");
+
+    const rows = await sql`SELECT passage_id, audio_key FROM questions WHERE id = ${id}`;
+    if (rows.length === 0) return jsonRes({ success: true });
+    await assertPassageAccess(sql, user.userId, rows[0].passage_id as number);
+
+    if (rows[0].audio_key) await store.delete(rows[0].audio_key as string);
+    await sql`DELETE FROM questions WHERE id = ${id}`;
+    return jsonRes({ success: true });
+  }
+
   throw new HttpError(405, "Method not allowed");
 });
