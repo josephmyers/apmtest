@@ -270,9 +270,10 @@ function QAPrepPageInner() {
     }
   };
 
-  // Where the playhead falls in the sorted group list — the Add Question
-  // button sits at this index so it appears between the surrounding groups.
-  const addButtonIndex = groups.filter((g) => g.start <= currentTime).length;
+  // Workaround a currentTime issue where dragging region end briefly changes currentTime.
+  // Use selection start when available.
+  const trueStart = selection ? selection.start : currentTime;
+  const addButtonIndex = groups.filter((g) => g.start <= trueStart).length;
 
   const addQuestionButton = (
     <>
