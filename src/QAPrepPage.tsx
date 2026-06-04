@@ -334,7 +334,15 @@ function QAPrepPageInner() {
             selectGroup(g);
           }}
           onTimeUpdate={setCurrentTime}
-          onSelectionChange={setSelection}
+          onSelectionChange={current => {
+            if (expandedGroupKey && selection) {
+              if (current && !questions.find(q => q.selectionStart === current.start && q.selectionEnd === current.end)) {
+                // If a range row was expanded and now the selection has changed (not matching a question), collapse
+                setExpandedGroupKey(null);
+              }
+            }
+            setSelection(current);
+          }}
           onPlayingChange={(playing) => {
             if (playing) {
               setPlayingAudio(passageAudio?.blob ?? null);
