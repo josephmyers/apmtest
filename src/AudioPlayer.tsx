@@ -632,7 +632,7 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
             start: t,
             drag: false,
             resize: false,
-            color: "#303030aa",
+            color: "#868686c5",
           });
         }
       });
@@ -685,7 +685,7 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
         if (r.end === r.start) r.remove();
       });
       for (const t of markers ?? []) {
-        rp.addRegion({ start: t, drag: false, resize: false, color: "#303030aa" });
+        rp.addRegion({ start: t, drag: false, resize: false, color: "#868686c5" });
       }
       // Keyed on marker values, not array identity.
     }, [(markers ?? []).join(",")]);
