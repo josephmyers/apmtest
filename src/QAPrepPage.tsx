@@ -508,6 +508,7 @@ function QAPrepPageInner() {
                 audio,
               );
               setQuestions((prev) => [...prev, q].sort(byDisplayOrder));
+              setExpandedGroupKey(`${sel.start}_${sel.end}`);
 
               passageAudioRef.current?.setTime(sel.start);
               passageAudioRef.current?.updateSelection(sel.start === sel.end ? null : sel);
