@@ -628,6 +628,8 @@ export interface Question {
   name: string;
   selectionStart: number;
   selectionEnd: number;
+  /** Manual slot within its group; null = natural order. */
+  sortOrder: number | null;
   audio: Blob;
 }
 
@@ -693,6 +695,24 @@ export async function deleteQuestion(
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "Failed to delete question");
+  return data;
+}
+
+/** Persist a group's order. `ids` are the group's question ids, in order. */
+export async function reorderQuestions(
+  token: string,
+  ids: number[],
+): Promise<{ success: boolean }> {
+  const res = await fetch(`${API_BASE}/questions`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ ids }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Failed to reorder questions");
   return data;
 }
 

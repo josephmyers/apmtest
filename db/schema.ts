@@ -79,5 +79,6 @@ export const questions = pgTable('questions', {
     selectionStart: doublePrecision('selection_start').notNull(),
     selectionEnd: doublePrecision('selection_end').notNull(),
     audioKey: varchar('audio_key', { length: 255 }),
+    sortOrder: integer('sort_order'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 });

@@ -45,7 +45,7 @@ export default handle(async (req: Request) => {
     }
 
     return jsonRes({
-      question: { id, title, name, selectionStart, selectionEnd },
+      question: { id, title, name, selectionStart, selectionEnd, sortOrder: null },
     });
   }
 
@@ -67,17 +67,18 @@ export default handle(async (req: Request) => {
     });
   }
 
-  // GET /questions?passageId=N — list ordered by selection_start
+  // GET /questions?passageId=N — list grouped by selection, ordered within each
+  // group by sort_order (NULLs, i.e. never-dragged, fall back to created_at).
   if (method === "GET") {
     const passageId = Number(url.searchParams.get("passageId"));
     if (!passageId) throw new HttpError(400, "passageId is required");
     await assertPassageAccess(sql, user.userId, passageId);
 
     const rows = await sql`
-      SELECT id, title, name, selection_start, selection_end
+      SELECT id, title, name, selection_start, selection_end, sort_order
       FROM questions
       WHERE passage_id = ${passageId}
-      ORDER BY selection_start, created_at
+      ORDER BY selection_start, selection_end, sort_order NULLS LAST, created_at, id
     `;
     return jsonRes({
       questions: rows.map((r: Record<string, unknown>) => ({
@@ -86,6 +87,7 @@ export default handle(async (req: Request) => {
         name: r.name,
         selectionStart: r.selection_start,
         selectionEnd: r.selection_end,
+        sortOrder: r.sort_order,
       })),
     });
   }
@@ -96,7 +98,10 @@ export default handle(async (req: Request) => {
     const id = Number(url.searchParams.get("id"));
     if (!id) throw new HttpError(400, "id is required");
 
-    const existing = await sql`SELECT passage_id FROM questions WHERE id = ${id}`;
+    const existing = await sql`
+      SELECT passage_id, selection_start, selection_end, sort_order
+      FROM questions WHERE id = ${id}
+    `;
     if (existing.length === 0) throw new HttpError(404, "Question not found");
     await assertPassageAccess(sql, user.userId, existing[0].passage_id as number);
 
@@ -104,6 +109,13 @@ export default handle(async (req: Request) => {
     const name = url.searchParams.get("name") || "";
     const selectionStart = Number(url.searchParams.get("selectionStart"));
     const selectionEnd = Number(url.searchParams.get("selectionEnd"));
+
+    // Moving a question to a new selection changes its group, so any manual
+    // position becomes meaningless — drop back to natural order.
+    const positionChanged =
+      existing[0].selection_start !== selectionStart ||
+      existing[0].selection_end !== selectionEnd;
+    const sortOrder = positionChanged ? null : (existing[0].sort_order as number | null);
 
     // Store the new recording first (if any) so audio_key can be set in the
     // same UPDATE. COALESCE leaves the existing key when no audio is sent.
@@ -120,12 +132,13 @@ export default handle(async (req: Request) => {
       UPDATE questions
       SET title = ${title}, name = ${name},
           selection_start = ${selectionStart}, selection_end = ${selectionEnd},
+          sort_order = ${sortOrder},
           audio_key = COALESCE(${audioKey}::text, audio_key)
       WHERE id = ${id}
     `;
 
     return jsonRes({
-      question: { id, title, name, selectionStart, selectionEnd },
+      question: { id, title, name, selectionStart, selectionEnd, sortOrder },
     });
   }
 
@@ -140,6 +153,24 @@ export default handle(async (req: Request) => {
 
     if (rows[0].audio_key) await store.delete(rows[0].audio_key as string);
     await sql`DELETE FROM questions WHERE id = ${id}`;
+    return jsonRes({ success: true });
+  }
+
+  // PATCH /questions — persist a group's order. Body: { ids: number[] } listing
+  // the group's question ids in their desired order
+  if (method === "PATCH") {
+    const { ids } = (await req.json()) as { ids?: unknown };
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw new HttpError(400, "ids must be a non-empty array");
+    }
+
+    const orderedIds = ids.map(Number);
+    await sql`
+      UPDATE questions AS q
+      SET sort_order = v.ord - 1
+      FROM unnest(${orderedIds}::int[]) WITH ORDINALITY AS v(id, ord)
+      WHERE q.id = v.id
+    `;
     return jsonRes({ success: true });
   }
 

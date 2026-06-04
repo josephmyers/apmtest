@@ -20,6 +20,21 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+  arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { useAuth } from "./AuthContext";
 import { useSnackbar } from "./useSnackbar";
 import PageHeader from "./PageHeader";
@@ -32,6 +47,7 @@ import {
   saveQuestion,
   updateQuestion,
   deleteQuestion,
+  reorderQuestions,
   type PassageVersion,
   type Question,
 } from "./api";
@@ -60,6 +76,82 @@ interface QuestionGroup {
   start: number;
   end: number;
   questions: Question[];
+}
+
+/**
+ * Display comparator, mirroring the server's `ORDER BY`
+ */
+function byDisplayOrder(a: Question, b: Question): number {
+  return (
+    a.selectionStart - b.selectionStart ||
+    a.selectionEnd - b.selectionEnd ||
+    (a.sortOrder ?? Infinity) - (b.sortOrder ?? Infinity)
+  );
+}
+
+function SortableQuestionRow({
+  q,
+  showDragHandle,
+  playing,
+  onPlayingChange,
+  onEdit,
+  onDelete,
+}: {
+  q: Question;
+  showDragHandle: boolean;
+  playing: boolean;
+  onPlayingChange: (playing: boolean) => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: q.id });
+
+  return (
+    <Stack
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      direction="row"
+      alignItems="center"
+      spacing={1}
+      sx={{
+        px: 1,
+        py: 1,
+        position: "relative",
+        zIndex: isDragging ? 1 : 0,
+        opacity: isDragging ? 0.5 : 1,
+      }}
+    >
+      {showDragHandle && (
+        <DragIndicatorIcon
+          fontSize="small"
+          sx={{ color: "text.disabled", cursor: "grab", touchAction: "none" }}
+          {...attributes}
+          {...listeners}
+        />
+      )}
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <MiniAudioPlayer
+          audio={q.audio}
+          playing={playing}
+          onPlayingChange={onPlayingChange}
+          label={
+            <Stack direction="row" alignItems="center" spacing={0.5}>
+              <Typography variant="body2" noWrap>
+                {q.title}
+              </Typography>
+              <IconButton size="small" aria-label="edit question" onClick={onEdit}>
+                <EditOutlinedIcon fontSize="inherit" />
+              </IconButton>
+            </Stack>
+          }
+        />
+      </Box>
+      <IconButton size="small" onClick={onDelete}>
+        <DeleteOutlineIcon fontSize="small" />
+      </IconButton>
+    </Stack>
+  );
 }
 
 function QAPrepPageInner() {
@@ -150,6 +242,31 @@ function QAPrepPageInner() {
       setQuestions((prev) => prev.filter((x) => x.id !== q.id));
     } catch (err) {
       setSnackMsg(err instanceof Error ? err.message : "Failed to delete question");
+    }
+  };
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+  );
+
+  const handleDragEnd = async (group: QuestionGroup, event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!token || !over || active.id === over.id) return;
+    const ids = group.questions.map((q) => q.id);
+    const oldIndex = ids.indexOf(active.id as number);
+    const newIndex = ids.indexOf(over.id as number);
+    if (oldIndex === -1 || newIndex === -1) return;
+    const newIds = arrayMove(ids, oldIndex, newIndex);
+    try {
+      await reorderQuestions(token, newIds);
+      const order = new Map(newIds.map((id, i) => [id, i]));
+      setQuestions((prev) =>
+        prev
+          .map((q) => (order.has(q.id) ? { ...q, sortOrder: order.get(q.id)! } : q))
+          .sort(byDisplayOrder),
+      );
+    } catch (err) {
+      setSnackMsg(err instanceof Error ? err.message : "Failed to reorder questions");
     }
   };
 
@@ -277,24 +394,20 @@ function QAPrepPageInner() {
                       {!expanded && <ExpandMoreIcon fontSize="small" />}
                     </ListItemButton>
                     <Collapse in={expanded} unmountOnExit>
-                      {group.questions.map((q) => (
-                        <Stack
-                          key={q.id}
-                          direction="row"
-                          alignItems="center"
-                          spacing={1}
-                          sx={{ px: 1, py: 1 }}
+                      <DndContext
+                        sensors={sensors}
+                        collisionDetection={closestCenter}
+                        onDragEnd={(e) => handleDragEnd(group, e)}
+                      >
+                        <SortableContext
+                          items={group.questions.map((q) => q.id)}
+                          strategy={verticalListSortingStrategy}
                         >
-                          {/* Drag handle — placeholder only, no DnD yet. */}
-                          {group.questions.length > 1 && (
-                            <DragIndicatorIcon
-                              fontSize="small"
-                              sx={{ color: "text.disabled", cursor: "grab" }}
-                            />
-                          )}
-                          <Box sx={{ flex: 1, minWidth: 0 }}>
-                            <MiniAudioPlayer
-                              audio={q.audio}
+                          {group.questions.map((q) => (
+                            <SortableQuestionRow
+                              key={q.id}
+                              q={q}
+                              showDragHandle={group.questions.length > 1}
                               playing={playingAudio === q.audio}
                               onPlayingChange={(playing) => {
                                 if (playing) {
@@ -304,34 +417,12 @@ function QAPrepPageInner() {
                                   setPlayingAudio(null);
                                 }
                               }}
-                              label={
-                                <Stack
-                                  direction="row"
-                                  alignItems="center"
-                                  spacing={0.5}
-                                >
-                                  <Typography variant="body2" noWrap>
-                                    {q.title}
-                                  </Typography>
-                                  <IconButton
-                                    size="small"
-                                    aria-label="edit question"
-                                    onClick={() => setEditingQuestion(q)}
-                                  >
-                                    <EditOutlinedIcon fontSize="inherit" />
-                                  </IconButton>
-                                </Stack>
-                              }
+                              onEdit={() => setEditingQuestion(q)}
+                              onDelete={() => handleDeleteQuestion(q)}
                             />
-                          </Box>
-                          <IconButton
-                            size="small"
-                            onClick={() => handleDeleteQuestion(q)}
-                          >
-                            <DeleteOutlineIcon fontSize="small" />
-                          </IconButton>
-                        </Stack>
-                      ))}
+                          ))}
+                        </SortableContext>
+                      </DndContext>
                       <Box sx={{ px: 2, py: 1 }}>
                         <Button
                           fullWidth
@@ -398,12 +489,8 @@ function QAPrepPageInner() {
                 sel.end,
                 audio,
               );
-              setQuestions((prev) =>
-                [...prev, q].sort(
-                  (a, b) => a.selectionStart - b.selectionStart,
-                ),
-              );
-              
+              setQuestions((prev) => [...prev, q].sort(byDisplayOrder));
+
               passageAudioRef.current?.setTime(sel.start);
               passageAudioRef.current?.updateSelection(sel.start === sel.end ? null : sel);
               passageAudioRef.current?.resetZoom();
@@ -443,7 +530,7 @@ function QAPrepPageInner() {
               setQuestions((prev) =>
                 prev
                   .map((x) => (x.id === editingQuestion.id ? updated : x))
-                  .sort((a, b) => a.selectionStart - b.selectionStart),
+                  .sort(byDisplayOrder),
               );
               setEditingQuestion(null);
             } catch (err) {
