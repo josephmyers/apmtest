@@ -164,6 +164,7 @@ function QAPrepPageInner() {
   const projectId = nav?.projectId;
 
   const passageAudioRef = useRef<AudioPlayerHandle>(null);
+  const expandedRowRef = useRef<HTMLDivElement>(null);
   const [passageAudio, setPassageAudio] = useState<{ blob: Blob; version: PassageVersion } | null>(null);
   const [audioInitialized, setAudioInitialized] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -223,6 +224,13 @@ function QAPrepPageInner() {
     const near = groups.some((g) => Math.abs(currentTime - g.start) <= 0.1);
     if (!near) setExpandedGroupKey(null);
   }, [currentTime, expandedGroupKey, groups]);
+
+  // Scroll the newly-expanded row into view
+  useEffect(() => {
+    if (expandedGroupKey) {
+      expandedRowRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [expandedGroupKey]);
 
   const selectGroup = (group: QuestionGroup) => {
     setPlayingAudio(null);
@@ -379,6 +387,7 @@ function QAPrepPageInner() {
                 <Fragment key={group.key}>
                   {!expandedGroupKey && i === addButtonIndex && addQuestionButton}
                   <Paper
+                    ref={expanded ? expandedRowRef : undefined}
                     elevation={1}
                     sx={{
                       mb: 2,
