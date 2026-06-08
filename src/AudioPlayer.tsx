@@ -74,6 +74,9 @@ export interface AudioPlayerProps {
   /** Allow user to drag-create a selection on the waveform */
   enableDragSelection?: boolean;
 
+  /** Double-tap the waveform to select the entire clip (default: false) */
+  selectAllOnDoubleClick?: boolean;
+
   /** WaveSurfer waveColor (default: theme palette `waveform.main`) */
   waveColor?: string;
   /** WaveSurfer progressColor (default: theme palette `waveform.main`) */
@@ -182,6 +185,7 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
     {
       audioSource,
       enableDragSelection = false,
+      selectAllOnDoubleClick = false,
       waveColor: waveColorProp,
       progressColor: progressColorProp,
       height = 80,
@@ -351,6 +355,24 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
       setIsRecording(false);
     };
 
+    // Apply or clear the single selection region.
+    const applySelection = (sel: { start: number; end: number } | null) => {
+      const rp = regionsRef.current;
+      if (rp) {
+        rp.getRegions().forEach((r) => {
+          if (r.start !== r.end) r.remove();
+        });
+        if (sel) {
+          programmaticRef.current = true;
+          rp.addRegion({ start: sel.start, end: sel.end });
+          programmaticRef.current = false;
+          wsRef.current?.setTime(sel.start);
+        }
+      }
+      setSelection(sel);
+      fireSelectionChange(sel, "user");
+    };
+
     // Imperative handle
     useImperativeHandle(ref, () => ({
       setTime: (t: number) => wsRef.current?.setTime(t),
@@ -362,22 +384,7 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
       startRecording,
       stopRecording,
       pushUndo,
-      updateSelection: (sel: { start: number; end: number } | null) => {
-        const rp = regionsRef.current;
-        if (rp) {
-          rp.getRegions().forEach((r) => {
-            if (r.start !== r.end) r.remove();
-          });
-          if (sel) {
-            programmaticRef.current = true;
-            rp.addRegion({ start: sel.start, end: sel.end });
-            programmaticRef.current = false;
-            wsRef.current?.setTime(sel.start);
-          }
-        }
-        setSelection(sel);
-        fireSelectionChange(sel, "user");
-      },
+      updateSelection: applySelection,
       resetZoom: () => {
         const ws = wsRef.current;
         if (ws) ws.zoom(1);
@@ -569,6 +576,15 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
           fireSelectionChange(null, "user");
         }
       });
+
+      // --- Waveform double-click: select the entire clip ---
+      if (selectAllOnDoubleClick) {
+        ws.on("dblclick", () => {
+          const dur = ws.getDuration();
+          if (!dur) return;
+          applySelection({ start: 0, end: dur });
+        });
+      }
 
       // --- Playback events ---
       ws.on("play", () => {

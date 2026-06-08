@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   Backdrop,
@@ -168,6 +168,7 @@ function QAPrepPageInner() {
   const [passageAudio, setPassageAudio] = useState<{ blob: Blob; version: PassageVersion } | null>(null);
   const [audioInitialized, setAudioInitialized] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
   const [selection, setSelection] = useState<{ start: number; end: number } | null>(null);
   const [addQuestionOpen, setAddQuestionOpen] = useState(false);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -283,6 +284,20 @@ function QAPrepPageInner() {
   const trueStart = selection ? selection.start : currentTime;
   const addButtonIndex = groups.filter((g) => g.start <= trueStart).length;
 
+  // A double-tap "select all" region covers the whole waveform, so a tap on the
+  // waveform can't clear it (the region swallows the click). As an escape hatch, a
+  // tap anywhere on the page that isn't interactive clears this selection.
+  const selectionIsEntirePassage =
+    !!selection &&
+    duration > 0 &&
+    selection.start <= 0.001 &&
+    selection.end >= duration - 0.001;
+  const handlePageClick = (e: MouseEvent) => {
+    if (!selectionIsEntirePassage) return;
+    if ((e.target as HTMLElement).closest("button, a, .MuiButtonBase-root")) return;
+    passageAudioRef.current?.updateSelection(null);
+  };
+
   const addQuestionButton = (
     <>
     <Typography variant="body2" sx={{ mb: 1 }}>
@@ -328,13 +343,17 @@ function QAPrepPageInner() {
         racetrack
       />
 
-      <Box sx={{ px: 2, pt: 2, pb: 1, flexShrink: 0 }}>
+      <Box
+        onClick={handlePageClick}
+        sx={{ px: 2, pt: 2, pb: 1, flexShrink: 0 }}>
         <AudioPlayer
           ref={passageAudioRef}
           audioSource={passageAudio?.blob ?? undefined}
           height={80}
           enableDragSelection
+          selectAllOnDoubleClick
           markers={[...new Set(groups.map((g) => g.start))]}
+          onReady={setDuration}
           onWaveformClick={(_time, marker) => {
             if (marker === undefined) return;
             const g = groups.find((g) => g.start === marker);
@@ -362,6 +381,7 @@ function QAPrepPageInner() {
       </Box>
 
       <Box
+        onClick={handlePageClick}
         sx={{
           flex: 1,
           minHeight: 0,
