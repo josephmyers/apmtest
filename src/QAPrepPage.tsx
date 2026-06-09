@@ -200,6 +200,13 @@ function QAPrepPageInner() {
       getQuestions(token, passage.id),
     ]).then(([blob, { versions }, qs]) => {
       setQuestions(qs);
+
+      // Open the first "0 group" if present
+      const zeroGroup = qs
+        .filter((q) => q.selectionStart <= 0.001)
+        .sort((a, b) => a.selectionStart - b.selectionStart || a.selectionEnd - b.selectionEnd)[0];
+      if (zeroGroup) setExpandedGroupKey(`${zeroGroup.selectionStart}_${zeroGroup.selectionEnd}`);
+
       if (!blob) {
         setAudioInitialized(true);
         return;
