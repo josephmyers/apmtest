@@ -46,16 +46,26 @@ export default function MiniAudioPlayer({
     setCurrentTime(0);
     setDuration(0);
 
-    const onLoaded = () => setDuration(el.duration || 0);
+    let cancelled = false;
+    audio.arrayBuffer()
+      .then((buf) => {
+        const ctx = new AudioContext();
+        return ctx.decodeAudioData(buf).then((decoded) => {
+          ctx.close();
+          return decoded.duration;
+        });
+      })
+      .then((dur) => { if (!cancelled) setDuration(dur); })
+      .catch(() => {});
+
     const onTime = () => setCurrentTime(el.currentTime);
     const onEnded = () => onPlayingChangeRef.current(false);
-    el.addEventListener("loadedmetadata", onLoaded);
     el.addEventListener("timeupdate", onTime);
     el.addEventListener("ended", onEnded);
 
     return () => {
+      cancelled = true;
       el.pause();
-      el.removeEventListener("loadedmetadata", onLoaded);
       el.removeEventListener("timeupdate", onTime);
       el.removeEventListener("ended", onEnded);
       URL.revokeObjectURL(url);
