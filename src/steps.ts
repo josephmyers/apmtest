@@ -16,6 +16,7 @@ export interface StepDef {
 export const STEPS: StepDef[] = [
   { id: 1, title: "Record", route: "/record" },
   { id: 2, title: "Community Test Q&A Prep", route: "/qa-prep" },
+  { id: 3, title: "Community Test Q&A", route: "/qa" },
 ];
 
 export const FIRST_STEP = STEPS[0];

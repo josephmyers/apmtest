@@ -15,6 +15,7 @@ import ProjectsPage from "./ProjectsPage";
 import SwitchTeamsPage from "./SwitchTeamsPage";
 import RecordPage from "./RecordPage";
 import QAPrepPage from "./QAPrepPage";
+import QAPage from "./QAPage";
 import ReplaceAIPage from "./ReplaceAIPage";
 
 const PRIMARY_MAIN = "#1f80ff";
@@ -163,17 +164,17 @@ const theme = createTheme({
     },
     MuiSlider: {
       styleOverrides: {
-        root: {
-          color: "rgba(0, 0, 0, 0.7)",
+        root: ({ theme }) => ({
+          color: theme.palette.grey[700],
           paddingBlock: "10px !important", //overrides padding changes between mobile and desktop
-        },
+        }),
       },
     },
     MuiIconButton: {
       styleOverrides: {
-        root: {
-          color: "rgba(0, 0, 0, 0.7)",
-        },
+        root: ({ theme }) => ({
+          color: theme.palette.grey[700],
+        }),
       },
       variants: [
         {
@@ -295,6 +296,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <QAPrepPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/qa"
+        element={
+          <ProtectedRoute>
+            <QAPage />
           </ProtectedRoute>
         }
       />

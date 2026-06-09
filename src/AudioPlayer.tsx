@@ -94,6 +94,8 @@ export interface AudioPlayerProps {
   onRecordingComplete?: (blob: Blob) => void;
   /** Called when playback starts or stops */
   onPlayingChange?: (playing: boolean) => void;
+  /** Called once when playback reaches the end of the clip. */
+  onFinish?: () => void;
 
   /** Menu items to show in the overflow menu (e.g. <MenuItem> elements) */
   menuItems?: React.ReactNode;
@@ -203,6 +205,7 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
       shouldStopAfterStickySelection = true,
       onRecordingComplete,
       onPlayingChange,
+      onFinish,
       onAudioChange,
       highlights = [],
       enableZoom = true,
@@ -305,6 +308,10 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
     useEffect(() => {
       onPlayingChangeRef.current = onPlayingChange;
     }, [onPlayingChange]);
+    const onFinishRef = useRef(onFinish);
+    useEffect(() => {
+      onFinishRef.current = onFinish;
+    }, [onFinish]);
     const onSelectionChangeRef = useRef(onSelectionChange);
     useEffect(() => {
       onSelectionChangeRef.current = onSelectionChange;
@@ -652,7 +659,10 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
           });
         }
       });
-      ws.on("finish", () => setPlaying(false));
+      ws.on("finish", () => {
+        setPlaying(false);
+        onFinishRef.current?.();
+      });
 
       return () => {
         dragCleanupRef.current?.();
