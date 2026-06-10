@@ -112,7 +112,7 @@ export default function MiniAudioPlayer({
             step={0.01}
             disabled={duration <= 0}
             onChange={handleSeek}
-            sx={{ py: 0.5, ml: 0.5, flex: 1 }}
+            sx={{ py: 0.5, ml: 0.5, flex: 1, touchAction: "pan-y" }}
           />
           <Box sx={{ width: 2, flexShrink: 0 }} />
         </Stack>
