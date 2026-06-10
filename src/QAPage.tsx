@@ -232,7 +232,11 @@ function QAPageInner() {
           audioSource={passageAudio ?? undefined}
           height={80}
           markers={markers}
-          onFinish={() => setHasListenedToPassage(true)}
+          onFinish={() => {
+            const shouldStartQuestions = !hasListenedToPassage;
+            setHasListenedToPassage(true);
+            if (shouldStartQuestions) goToQuestion(0);
+          }}
           enableDragSelection
           onPlayingChange={(playing) => {
             if (playing) {
