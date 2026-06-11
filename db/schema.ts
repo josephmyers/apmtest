@@ -82,3 +82,11 @@ export const questions = pgTable('questions', {
     sortOrder: integer('sort_order'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 });
+
+export const answers = pgTable('answers', {
+    id: serial('id').primaryKey(),
+    questionId: integer('question_id').notNull().unique().references(() => questions.id, { onDelete: 'cascade' }),
+    speaker: varchar('speaker', { length: 255 }).notNull().default(''),
+    audioKey: varchar('audio_key', { length: 255 }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+});

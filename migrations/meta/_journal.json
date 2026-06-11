@@ -50,6 +50,13 @@
       "when": 1780589004657,
       "tag": "0006_pink_wilson_fisk",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1781182807193,
+      "tag": "0007_spotty_devos",
+      "breakpoints": true
     }
   ]
 }

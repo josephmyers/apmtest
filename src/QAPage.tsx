@@ -24,7 +24,15 @@ import { useSnackbar } from "./useSnackbar";
 import PageHeader from "./PageHeader";
 import StepFooter from "./StepFooter";
 import { PassageProvider, usePassage } from "./PassageContext";
-import { fetchAudio, getQuestions, type Question } from "./api";
+import {
+  fetchAudio,
+  getQuestions,
+  getAnswers,
+  saveAnswer,
+  deleteAnswer,
+  type Question,
+  type Answer,
+} from "./api";
 import { type StepNavState } from "./steps";
 import { AudioPlayer, type AudioPlayerHandle } from "./AudioPlayer";
 import { formatTime } from "./formatTime";
@@ -64,13 +72,13 @@ function QAPageInner() {
   
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [answers, setAnswers] = useState<Map<number, Blob>>(new Map());
+  const [answers, setAnswers] = useState<Map<number, Answer>>(new Map());
   const [recording, setRecording] = useState(false);
   const [warmingUp, setWarmingUp] = useState(false);
   // 0–100 playback progress through the current question's prompt audio.
   const [promptProgress, setPromptProgress] = useState(0);
   // Question ids whose prompt the user has started playing (page lifetime).
-  const [listened, setListened] = useState<Set<number>>(new Set());
+  const [hasListenedToQuestion, setHasListenedToQuestion] = useState<Set<number>>(new Set());
 
   // The single source currently playing (or null).
   const [playingAudio, setPlayingAudio] = useState<{ pause: () => void } | null>(null);
@@ -85,10 +93,19 @@ function QAPageInner() {
     Promise.all([
       fetchAudio(token, passage.id),
       getQuestions(token, passage.id),
-    ]).then(([blob, qs]) => {
+      getAnswers(token, passage.id),
+    ]).then(([blob, qs, ans]) => {
       setQuestions(qs);
       setPassageAudio(blob);
-      setSpeaker(passage.speaker)
+      setSpeaker(passage.speaker);
+
+      const loaded = new Map<number, Answer>();
+      for (const answer of ans) {
+        loaded.set(answer.questionId, answer);
+      }
+      setAnswers(loaded);
+      if (ans.length > 0) setHasListenedToPassage(true);
+      
       setAudioInitialized(true);
     });
   }, [token, passage]);
@@ -131,7 +148,7 @@ function QAPageInner() {
     if (!el) return;
     if (playingAudio === el) {
       onPlay(null);
-      setListened((prev) =>
+      setHasListenedToQuestion((prev) =>
         prev.has(currentQuestion.id) ? prev : new Set(prev).add(currentQuestion.id),
       );
     } else {
@@ -143,8 +160,10 @@ function QAPageInner() {
   const goToQuestion = (index: number) => {
     onPlay(null);
     setCurrentIndex(index);
-    
+
     const q = questions[index];
+    const existing = answers.get(q.id);
+    if (existing) setSpeaker(existing.speaker);
     const isRange = q.selectionStart !== q.selectionEnd;
     passageRef.current?.updateSelection(
       isRange ? { start: q.selectionStart, end: q.selectionEnd } : null,
@@ -154,7 +173,7 @@ function QAPageInner() {
 
   const toggleRecording = async () => {
     if (warmingUp || !speaker) return;
-    if (!recording && !answers.has(currentQuestion.id) && !questionListened) return;
+    if (!recording && !answers.has(currentQuestion.id)) return;
     if (!recording) {
       try {
         onPlay(null);
@@ -175,13 +194,24 @@ function QAPageInner() {
     }
   };
 
-  const setAnswer = (id: number, blob: Blob | null) => {
-    setAnswers((prev) => {
-      const next = new Map(prev);
-      if (blob) next.set(id, blob);
-      else next.delete(id);
-      return next;
-    });
+  const setAnswer = async (questionId: number, blob: Blob | null) => {
+    if (!token) return;
+    try {
+      if (blob) {
+        const spk = speaker ?? "";
+        await saveAnswer(token, questionId, spk, blob);
+        setAnswers((prev) => new Map(prev).set(questionId, { questionId, audio: blob, speaker: spk }));
+      } else {
+        await deleteAnswer(token, questionId);
+        setAnswers((prev) => {
+          const next = new Map(prev);
+          next.delete(questionId);
+          return next;
+        });
+      }
+    } catch (err) {
+      setSnackMsg(err instanceof Error ? err.message : "Failed to save answer");
+    }
   };
 
   const markers = useMemo(
@@ -193,8 +223,7 @@ function QAPageInner() {
   const percent =
     questions.length > 0 ? Math.round((answered / questions.length) * 100) : 0;
   const promptPlaying = playingAudio != null && playingAudio === promptAudioRef.current;
-  const questionListened = !!currentQuestion && listened.has(currentQuestion.id);
-  const canRecord = !!speaker && questionListened;
+  const canRecord = !!speaker && hasListenedToQuestion.has(currentQuestion.id);
   const showFooter = !hasListenedToPassage || questions.length === 0 || percent === 100;
   const prevDisabled = currentIndex === 0 || recording || warmingUp;
   const playDisabled = recording || warmingUp;
@@ -378,7 +407,7 @@ function QAPageInner() {
               <AudioPlayer
                 key={currentQuestion.id}
                 ref={answerRef}
-                audioSource={answers.get(currentQuestion.id) ?? undefined}
+                audioSource={answers.get(currentQuestion.id)?.audio ?? undefined}
                 height={60}
                 enableZoom={false}
                 showTrash
@@ -418,8 +447,26 @@ function QAPageInner() {
 
             <TextField
               placeholder="Name"
-              value={speaker}
+              value={speaker ?? ""}
               onChange={(e) => setSpeaker(e.target.value)}
+              onBlur={() => {
+                if (!token) return;
+                const existing = answers.get(currentQuestion.id);
+                const spk = speaker ?? "";
+                if (existing && existing.speaker !== spk) {
+                  saveAnswer(token, currentQuestion.id, spk)
+                    .then(() =>
+                      setAnswers((prev) =>
+                        new Map(prev).set(currentQuestion.id, { ...existing, speaker: spk }),
+                      ),
+                    )
+                    .catch((err) =>
+                      setSnackMsg(
+                        err instanceof Error ? err.message : "Failed to update speaker",
+                      ),
+                    );
+                }
+              }}
               size="small"
               sx={{ maxWidth: "110px", mt: "4px !important" }}
             />

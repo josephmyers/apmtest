@@ -752,6 +752,85 @@ export async function fetchQuestionAudio(
   return await res.blob();
 }
 
+export interface Answer {
+  questionId: number;
+  speaker: string;
+  audio: Blob;
+}
+
+export async function getAnswers(
+  token: string,
+  passageId: number,
+): Promise<Answer[]> {
+  const res = await fetch(`${API_BASE}/answers?passageId=${passageId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = (await res.json()) as {
+    answers: { questionId: number; speaker: string }[];
+  };
+  if (!res.ok) throw new Error("Failed to fetch answers");
+  return Promise.all(
+    data.answers.map(async (a) => ({
+      ...a,
+      audio: (await fetchAnswerAudio(token, a.questionId))!,
+    })),
+  );
+}
+
+/**
+ * Save a question's answer. With `audioBlob`, records or replaces the answer
+ * (audio + speaker); without it, updates just the speaker of an existing answer.
+ */
+export async function saveAnswer(
+  token: string,
+  questionId: number,
+  speaker: string,
+  audioBlob?: Blob,
+): Promise<{ questionId: number; speaker: string }> {
+  const params = new URLSearchParams({
+    questionId: String(questionId),
+    speaker,
+  });
+  const res = await fetch(`${API_BASE}/answers?${params}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: audioBlob,
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Failed to save answer");
+  return data.answer;
+}
+
+/** Clear a question's answer (removes the recording from the question). */
+export async function deleteAnswer(
+  token: string,
+  questionId: number,
+): Promise<{ success: boolean }> {
+  const res = await fetch(`${API_BASE}/answers?questionId=${questionId}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Failed to delete answer");
+  return data;
+}
+
+export async function fetchAnswerAudio(
+  token: string,
+  questionId: number,
+): Promise<Blob | null> {
+  const res = await fetch(
+    `${API_BASE}/answers?questionId=${questionId}&audio=1`,
+    {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    },
+  );
+  if (res.status === 404) return null;
+  if (!res.ok) return null;
+  return await res.blob();
+}
+
 export async function deleteUnversionedReplacements(
   token: string,
   passageId: number,

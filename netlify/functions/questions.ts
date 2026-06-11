@@ -152,6 +152,11 @@ export default handle(async (req: Request) => {
     await assertPassageAccess(sql, user.userId, rows[0].passage_id as number);
 
     if (rows[0].audio_key) await store.delete(rows[0].audio_key as string);
+    // The answer row cascades via the FK, but its blob must be removed explicitly.
+    const answerRows = await sql`SELECT audio_key FROM answers WHERE question_id = ${id}`;
+    if (answerRows.length > 0 && answerRows[0].audio_key) {
+      await store.delete(answerRows[0].audio_key as string);
+    }
     await sql`DELETE FROM questions WHERE id = ${id}`;
     return jsonRes({ success: true });
   }
