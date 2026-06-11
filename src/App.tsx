@@ -7,7 +7,7 @@ import {
   CircularProgress,
   Box,
 } from "@mui/material";
-import { darken } from "@mui/material/styles";
+import { alpha, darken, lighten } from "@mui/material/styles";
 import { AuthProvider, useAuth } from "./AuthContext";
 import LoginPage from "./LoginPage";
 import Dashboard from "./Dashboard";
@@ -50,12 +50,14 @@ const theme = createTheme({
   palette: {
     primary: {
       main: PRIMARY_MAIN,
+      light: lighten(PRIMARY_MAIN, 0.8),
     },
     alert: {
       main: RECORD_READY_RED,
     },
     secondary: {
       main: "#9fc5e8",
+      light: alpha("#9fc5e8", 0.13)
     },
     neutral: {
       main: "#000000",

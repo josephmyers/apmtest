@@ -23,7 +23,6 @@ import {
   Typography,
 } from "@mui/material";
 import PeopleOutlineIcon from "@mui/icons-material/PeopleOutline";
-import { darken } from "@mui/material/styles";
 import MenuBookIcon from "@mui/icons-material/MenuBook";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -162,7 +161,6 @@ export default function ProjectsPage() {
 
         {projects.length === 0 && !error ? (
           <Typography
-            color="text.secondary"
             sx={{ textAlign: "center", py: 6 }}
           >
             No projects yet. Click "Add Project" below to create one.
@@ -254,7 +252,7 @@ function ProjectCard({
   return (
     <Card
       sx={{
-        bgcolor: (theme) => darken(theme.palette.secondary.main, 0.05),
+        bgcolor: (theme) => theme.palette.primary.light,
         position: "relative",
         borderRadius: 2,
       }}
