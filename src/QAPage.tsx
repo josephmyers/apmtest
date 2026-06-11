@@ -261,6 +261,11 @@ function QAPageInner() {
           audioSource={passageAudio ?? undefined}
           height={80}
           markers={markers}
+          onWaveformClick={(_time, marker) => {
+            if (marker === undefined || recording || warmingUp) return;
+            const index = questions.findIndex((q) => q.selectionStart === marker);
+            if (index !== -1) goToQuestion(index);
+          }}
           onFinish={() => {
             const shouldStartQuestions = !hasListenedToPassage;
             setHasListenedToPassage(true);
