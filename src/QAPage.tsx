@@ -231,7 +231,7 @@ function QAPageInner() {
     questions.length > 0 ? Math.round((answered / questions.length) * 100) : 0;
   const promptPlaying = playingAudio != null && playingAudio === promptAudioRef.current;
   const canRecord = !!speaker && hasListenedToQuestion.has(currentQuestion.id);
-  const showFooter = !hasListenedToPassage || questions.length === 0 || percent === 100;
+  const showFooter = !hasListenedToPassage || questions.length === 0 || percent === 100 || currentIndex === questions.length-1;
   const prevDisabled = currentIndex === 0 || recording || warmingUp;
   const playDisabled = recording || warmingUp;
   const nextDisabled =
