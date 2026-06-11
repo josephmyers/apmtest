@@ -537,7 +537,7 @@ function QAPageInner() {
       </Box>
 
       {showFooter && (
-        <StepFooter canComplete={hasListenedToPassage} onError={setSnackMsg} />
+        <StepFooter canComplete={hasListenedToPassage} isCompletePrimary={percent === 100} onError={setSnackMsg} />
       )}
 
       {snackbarElement}
