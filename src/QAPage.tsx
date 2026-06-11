@@ -12,6 +12,7 @@ import {
   Stack,
   TextField,
   Typography,
+  useTheme,
 } from "@mui/material";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import PauseIcon from "@mui/icons-material/Pause";
@@ -57,6 +58,7 @@ function QAPageInner() {
   const { token } = useAuth();
   const { passage } = usePassage();
   const { setSnackMsg, snackbarElement } = useSnackbar();
+  const theme = useTheme();
   const nav = location.state as StepNavState;
   const projectId = nav?.projectId;
 
@@ -179,8 +181,7 @@ function QAPageInner() {
   };
 
   const toggleRecording = async () => {
-    if (warmingUp || !speaker) return;
-    if (!recording && !answers.has(currentQuestion.id)) return;
+    if (warmingUp || !canRecord) return;
     if (!recording) {
       try {
         onPlay(null);
@@ -222,8 +223,16 @@ function QAPageInner() {
   };
 
   const markers = useMemo(
-    () => [...new Set(questions.map((q) => q.selectionStart))],
-    [questions],
+    () =>
+      [...new Set(questions.map((q) => q.selectionStart))].map((time) => ({
+        time,
+        color: questions
+          .filter((q) => q.selectionStart === time)
+          .every((q) => answers.has(q.id))
+          ? theme.palette.success.light
+          : undefined,
+      })),
+    [questions, answers],
   );
 
   const answered = answers.size;
@@ -347,7 +356,7 @@ function QAPageInner() {
               <Box sx={{ position: "relative", display: "inline-flex" }}>
                 {promptPlaying && (
                   <>
-                    {/* Grey track + black progress replace the border while playing. */}
+                    {/* Show progress while playing. */}
                     <CircularProgress
                       variant="determinate"
                       value={100}
@@ -409,7 +418,7 @@ function QAPageInner() {
                   variant="determinate"
                   value={percent}
                   size={20}
-                  sx={{ color: (theme) => theme.palette.grey[700], position: "absolute", left: 0 }}
+                  sx={{ color: (theme) => theme.palette.success.light, position: "absolute", left: 0 }}
                 />
               </Box>
               <Typography variant="body2">{percent}% Answered</Typography>

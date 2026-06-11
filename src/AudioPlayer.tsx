@@ -138,18 +138,26 @@ export interface AudioPlayerProps {
   /** Optional label rendered on the top row (after time display) */
   topRowLabel?: React.ReactNode;
 
-  /** Static markers (timestamps in seconds). */
-  markers?: number[];
+  /** Static markers — timestamps in seconds, optionally with a color (default grey). */
+  markers?: (number | AudioMarker)[];
 
   /** Fires on every waveform click. `marker` is the nearest marker timestamp within ~10px, if any. */
   onWaveformClick?: (timestamp: number, marker?: number) => void;
 }
 
+export interface AudioMarker {
+  /** Timestamp in seconds */
+  time: number;
+  /** Marker color */
+  color?: string;
+}
+
 /* ------------------------------------------------------------------ */
-/*  Marker click helpers                                               */
+/*  Marker helpers                                               */
 /* ------------------------------------------------------------------ */
 
 const GRACE_PX = 10;
+const DEFAULT_MARKER_COLOR = "#868686c5";
 
 function graceSec(ws: WaveSurfer, container: HTMLDivElement | null): number {
   const dur = ws.getDuration();
@@ -162,16 +170,16 @@ function graceSec(ws: WaveSurfer, container: HTMLDivElement | null): number {
 }
 
 function nearestMarkerWithin(
-  markers: number[],
+  markers: AudioMarker[],
   t: number,
   grace: number,
 ): number | undefined {
   let best: number | undefined;
   let bestD = Infinity;
   for (const m of markers) {
-    const d = Math.abs(m - t);
+    const d = Math.abs(m.time - t);
     if (d <= grace && d < bestD) {
-      best = m;
+      best = m.time;
       bestD = d;
     }
   }
@@ -281,12 +289,11 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
     useEffect(() => {
       highlightsRef.current = highlights;
     }, [highlights]);
-    const markersRef = useRef(markers);
-    useEffect(() => {
-      markersRef.current = markers;
-    }, [markers]);
-
-    // Stable callback refs so WaveSurfer listeners never go stale
+    const markerObjs = (markers ?? []).map((m) =>
+      typeof m === "number" ? { time: m } : m,
+    );
+    const markersRef = useRef(markerObjs);
+    markersRef.current = markerObjs;
     const onTimeUpdateRef = useRef(onTimeUpdate);
     const onReadyRef = useRef(onReady);
     useEffect(() => {
@@ -650,12 +657,12 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
         }
 
         // Re-add static markers
-        for (const t of markersRef.current ?? []) {
+        for (const m of markersRef.current) {
           regionsRef.current.addRegion({
-            start: t,
+            start: m.time,
             drag: false,
             resize: false,
-            color: "#868686c5",
+            color: m.color ?? DEFAULT_MARKER_COLOR,
           });
         }
       });
@@ -710,11 +717,16 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
       rp.getRegions().forEach((r) => {
         if (r.end === r.start) r.remove();
       });
-      for (const t of markers ?? []) {
-        rp.addRegion({ start: t, drag: false, resize: false, color: "#868686c5" });
+      for (const m of markersRef.current) {
+        rp.addRegion({
+          start: m.time,
+          drag: false,
+          resize: false,
+          color: m.color ?? DEFAULT_MARKER_COLOR,
+        });
       }
       // Keyed on marker values, not array identity.
-    }, [(markers ?? []).join(",")]);
+    }, [markerObjs.map((m) => `${m.time}|${m.color ?? ""}`).join(",")]);
 
     /* ----- Fire onWaveformClick (alongside the click handler) ----- */
     useEffect(() => {
