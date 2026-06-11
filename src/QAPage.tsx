@@ -14,7 +14,6 @@ import {
   Typography,
   useTheme,
 } from "@mui/material";
-import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import PauseIcon from "@mui/icons-material/Pause";
 import NavigateBeforeIcon from "@mui/icons-material/NavigateBefore";
 import NavigateNextIcon from "@mui/icons-material/NavigateNext";
@@ -37,6 +36,8 @@ import {
 import { type StepNavState } from "./steps";
 import { AudioPlayer, type AudioPlayerHandle } from "./AudioPlayer";
 import { formatTime } from "./formatTime";
+import RadialAudioPlayer from "./RadialAudioPlayer";
+import BrowseQuestionsDialog from "./BrowseQuestionsDialog";
 
 /**
  * Thin wrapper that keys PassageProvider on passageId so its state resets
@@ -64,7 +65,6 @@ function QAPageInner() {
 
   const passageRef = useRef<AudioPlayerHandle>(null);
   const answerRef = useRef<AudioPlayerHandle>(null);
-  const promptAudioRef = useRef<HTMLAudioElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [passageAudio, setPassageAudio] = useState<Blob | null>(null);
@@ -77,17 +77,12 @@ function QAPageInner() {
   const [answers, setAnswers] = useState<Map<number, Answer>>(new Map());
   const [recording, setRecording] = useState(false);
   const [warmingUp, setWarmingUp] = useState(false);
-  // 0–100 playback progress through the current question's prompt audio.
-  const [promptProgress, setPromptProgress] = useState(0);
+  const [questionsDialogOpen, setQuestionsDialogOpen] = useState(false);
   // Question ids whose prompt the user has started playing (page lifetime).
   const [hasListenedToQuestion, setHasListenedToQuestion] = useState<Set<number>>(new Set());
 
-  // The single source currently playing (or null).
+  // The audio currently playing
   const [playingAudio, setPlayingAudio] = useState<{ pause: () => void } | null>(null);
-  const playingAudioRef = useRef<{ pause: () => void } | null>(null);
-  useEffect(() => {
-    playingAudioRef.current = playingAudio;
-  }, [playingAudio]);
 
   // Init
   useEffect(() => {
@@ -114,55 +109,19 @@ function QAPageInner() {
 
   const currentQuestion = questions[currentIndex];
 
-  // (Re)create the prompt audio element for the current question. Cleanup on
-  // question change pauses + frees the URL, which also stops the prompt.
-  useEffect(() => {
-    if (!currentQuestion) return;
-    const url = URL.createObjectURL(currentQuestion.audio);
-    const el = new Audio(url);
-    promptAudioRef.current = el;
-    setPromptProgress(0);
-    const clearIfCurrent = () => {
-      if (playingAudioRef.current === el) setPlayingAudio(null);
-    };
-    // Finishing playback on its own counts as having listened to the prompt.
-    const onEnded = () => {
-      clearIfCurrent();
-      setHasListenedToQuestion((prev) =>
-        prev.has(currentQuestion.id) ? prev : new Set(prev).add(currentQuestion.id),
-      );
-    };
-    const onTime = () => {
-      setPromptProgress(el.duration ? (el.currentTime / el.duration) * 100 : 0);
-    };
-    el.addEventListener("ended", onEnded);
-    el.addEventListener("timeupdate", onTime);
-    return () => {
-      el.pause();
-      el.removeEventListener("ended", onEnded);
-      el.removeEventListener("timeupdate", onTime);
-      URL.revokeObjectURL(url);
-      promptAudioRef.current = null;
-      clearIfCurrent();
-    };
-  }, [currentQuestion]);
-
   const onPlay = (source: { pause: () => void } | null) => {
     if (playingAudio) playingAudio.pause();
     setPlayingAudio(source);
   };
 
-  const toggleQuestion = () => {
-    const el = promptAudioRef.current;
-    if (!el) return;
-    if (playingAudio === el) {
-      onPlay(null);
+  const onToggleQuestionPlay = (el: HTMLAudioElement | null) => {
+    if (el) {
+      onPlay(el);
+    } else {
+      setPlayingAudio(null);
       setHasListenedToQuestion((prev) =>
         prev.has(currentQuestion.id) ? prev : new Set(prev).add(currentQuestion.id),
       );
-    } else {
-      onPlay(el);
-      el.play();
     }
   };
 
@@ -238,7 +197,6 @@ function QAPageInner() {
   const answered = answers.size;
   const percent =
     questions.length > 0 ? Math.round((answered / questions.length) * 100) : 0;
-  const promptPlaying = playingAudio != null && playingAudio === promptAudioRef.current;
   const canRecord = !!speaker && hasListenedToQuestion.has(currentQuestion.id);
   const showFooter = !hasListenedToPassage || questions.length === 0 || percent === 100 || currentIndex === questions.length-1;
   const prevDisabled = currentIndex === 0 || recording || warmingUp;
@@ -324,20 +282,17 @@ function QAPageInner() {
           </Box>
         ) : (
           <Stack spacing={2} sx={{ mt: 1 }}>
-            <Box
-              sx={{
-                alignSelf: "center",
-                border: 1,
-                borderColor: "rgba(0,0,0,0.2)",
-                borderRadius: 1,
-                px: 2,
-                py: 0.5,
+            <Button
+              onClick={() => {
+                onPlay(null);
+                setQuestionsDialogOpen(true);
               }}
+              sx={{ alignSelf: "center" }}
             >
               <Typography variant="body2">
                 Question {currentIndex + 1} of {questions.length}
               </Typography>
-            </Box>
+            </Button>
 
             <Stack
               direction="row"
@@ -353,44 +308,11 @@ function QAPageInner() {
               >
                 <NavigateBeforeIcon />
               </IconButton>
-              <Box sx={{ position: "relative", display: "inline-flex" }}>
-                {promptPlaying && (
-                  <>
-                    {/* Show progress while playing. */}
-                    <CircularProgress
-                      variant="determinate"
-                      value={100}
-                      thickness={2}
-                      size={38}
-                      sx={{
-                        color: (theme) => theme.palette.grey[300],
-                        position: "absolute",
-                        top: 0,
-                        left: 0,
-                      }}
-                    />
-                    <CircularProgress
-                      variant="determinate"
-                      value={promptProgress}
-                      thickness={2}
-                      size={38}
-                      sx={{ color: (theme) => theme.palette.grey[700], position: "absolute", top: 0, left: 0 }}
-                    />
-                  </>
-                )}
-                <IconButton
-                  onClick={toggleQuestion}
-                  size="small"
-                  disabled={playDisabled}
-                  sx={{
-                    width: 38,
-                    height: 38,
-                    border: promptPlaying ? 0 : 2,
-                  }}
-                >
-                  {promptPlaying ? <PauseIcon /> : <PlayArrowIcon />}
-                </IconButton>
-              </Box>
+              <RadialAudioPlayer
+                audio={currentQuestion.audio}
+                onPlayingChange={onToggleQuestionPlay}
+                disabled={playDisabled}
+              />
               <IconButton
                 onClick={() => goToQuestion(currentIndex + 1)}
                 disabled={nextDisabled}
@@ -547,6 +469,19 @@ function QAPageInner() {
 
       {showFooter && (
         <StepFooter canComplete={hasListenedToPassage} isCompletePrimary={percent === 100} onError={setSnackMsg} />
+      )}
+
+      {questionsDialogOpen && (
+        <BrowseQuestionsDialog
+          questions={questions}
+          answers={answers}
+          currentIndex={currentIndex}
+          onClose={() => setQuestionsDialogOpen(false)}
+          onSelectQuestion={(i) => {
+            setQuestionsDialogOpen(false);
+            goToQuestion(i);
+          }}
+        />
       )}
 
       {snackbarElement}

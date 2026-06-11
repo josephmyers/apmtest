@@ -199,6 +199,16 @@ const theme = createTheme({
         },
       ],
     },
+    MuiCheckbox: {
+      styleOverrides: {
+        root: ({ theme }) => ({
+          color: theme.palette.text.primary,
+          "&.Mui-checked": {
+            color: theme.palette.text.primary,
+          },
+        }),
+      },
+    },
   },
 });
 
