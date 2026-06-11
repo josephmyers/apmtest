@@ -123,14 +123,21 @@ function QAPageInner() {
     const clearIfCurrent = () => {
       if (playingAudioRef.current === el) setPlayingAudio(null);
     };
+    // Finishing playback on its own counts as having listened to the prompt.
+    const onEnded = () => {
+      clearIfCurrent();
+      setHasListenedToQuestion((prev) =>
+        prev.has(currentQuestion.id) ? prev : new Set(prev).add(currentQuestion.id),
+      );
+    };
     const onTime = () => {
       setPromptProgress(el.duration ? (el.currentTime / el.duration) * 100 : 0);
     };
-    el.addEventListener("ended", clearIfCurrent);
+    el.addEventListener("ended", onEnded);
     el.addEventListener("timeupdate", onTime);
     return () => {
       el.pause();
-      el.removeEventListener("ended", clearIfCurrent);
+      el.removeEventListener("ended", onEnded);
       el.removeEventListener("timeupdate", onTime);
       URL.revokeObjectURL(url);
       promptAudioRef.current = null;
