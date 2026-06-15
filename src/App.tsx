@@ -39,7 +39,7 @@ declare module "@mui/material/Button" {
 
 declare module "@mui/material/IconButton" {
   interface IconButtonOwnProps {
-    variant?: "floating";
+    variant?: "floating" | "primary";
   }
 }
 
@@ -194,6 +194,19 @@ const theme = createTheme({
             "&:hover": {
               backgroundColor: "#f5f5f5",
               boxShadow: "0px 6px 16px rgba(0, 0, 0, 0.2)",
+            },
+          },
+        },
+        {
+          props: { variant: "primary" },
+          style: {
+            background: "#333",
+            color: "#fff",
+            "&:hover": {
+              background: "#555",
+            },
+            "&:disabled": {
+              background: "#f0f0f0",
             },
           },
         },

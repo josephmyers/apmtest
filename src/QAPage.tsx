@@ -203,6 +203,7 @@ function QAPageInner() {
   const playDisabled = recording || warmingUp;
   const nextDisabled =
     currentIndex === questions.length - 1 || recording || warmingUp;
+  const isQuestionAnswered = answers.get(currentQuestion?.id) !== undefined;
 
   return (
     <Box
@@ -318,6 +319,7 @@ function QAPageInner() {
                 disabled={nextDisabled}
                 size="small"
                 sx={{ border: 2 }}
+                variant={isQuestionAnswered && percent !== 100 ? "primary" : undefined}
               >
                 <NavigateNextIcon />
               </IconButton>
