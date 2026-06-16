@@ -113,7 +113,7 @@ export default function StepFooter({ canComplete, isCompletePrimary, onError }: 
         <Button
           endIcon={<ChevronRightIcon />}
           onClick={handleNext}
-          sx={{px: "12px"}}
+          sx={{px: "12px", minWidth: "90px"}}
         >
           Next
         </Button>
