@@ -907,6 +907,227 @@ export interface PassageVersion {
   createdAt: string;
 }
 
+// ─── Discussions ──────────────────────────────────────────────────────────
+
+/** A reference from a message to a selected range of some other audio. */
+export interface MessageAudioLink {
+  audioKey: string;
+  label: string;
+  start: number;
+  end: number;
+}
+
+/** Thread metadata for the list view; messages are fetched separately. */
+export interface Discussion {
+  id: number;
+  topic: string;
+  category: string;
+  assigneeEmail: string | null;
+  resolved: boolean;
+  unread: boolean;
+  createdBy: number;
+  createdAt: string;
+  messageCount: number;
+  lastActivity: string | null;
+}
+
+export interface DiscussionMessage {
+  id: number;
+  discussionId: number;
+  authorId: number;
+  authorEmail: string;
+  body: string | null;
+  hasAudio: boolean;
+  links: MessageAudioLink[];
+  createdAt: string;
+  audio: Blob | null;
+}
+
+/** Text or audio — the two mutually-exclusive forms a message can take. */
+export type MessageContent = { text: string } | { audio: Blob };
+
+// Apply the shared message params (links, audio flag) to `params`, and return
+// the request headers + body for a text or audio message.
+function buildMessageRequest(
+  token: string,
+  params: URLSearchParams,
+  content: MessageContent,
+  links: MessageAudioLink[],
+): { headers: HeadersInit; body: BodyInit } {
+  if (links.length) params.set("links", JSON.stringify(links));
+  if ("audio" in content) {
+    params.set("audio", "1");
+    return { headers: { Authorization: `Bearer ${token}` }, body: content.audio };
+  }
+  return {
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ text: content.text }),
+  };
+}
+
+export async function getDiscussions(
+  token: string,
+  passageId: number,
+  step: number,
+): Promise<Discussion[]> {
+  const res = await fetch(
+    `${API_BASE}/discussions?passageId=${passageId}&step=${step}`,
+    { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" },
+  );
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Failed to fetch discussions");
+  return data.discussions as Discussion[];
+}
+
+export async function createDiscussion(
+  token: string,
+  passageId: number,
+  step: number,
+  fields: { topic: string; category: string; assigneeId: number | null },
+  content: MessageContent,
+  links: MessageAudioLink[] = [],
+): Promise<{ discussion: Discussion }> {
+  const params = new URLSearchParams({
+    passageId: String(passageId),
+    step: String(step),
+    topic: fields.topic,
+    category: fields.category,
+  });
+  if (fields.assigneeId != null) params.set("assigneeId", String(fields.assigneeId));
+  const { headers, body } = buildMessageRequest(token, params, content, links);
+  const res = await fetch(`${API_BASE}/discussions?${params}`, { method: "POST", headers, body });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Failed to create discussion");
+  return data;
+}
+
+export async function markDiscussionRead(
+  token: string,
+  id: number,
+): Promise<{ success: boolean }> {
+  const res = await fetch(`${API_BASE}/discussions?id=${id}&read=1`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Failed to mark read");
+  return data;
+}
+
+export async function updateDiscussion(
+  token: string,
+  id: number,
+  fields: { topic: string; category: string; assigneeId: number | null; resolved: boolean },
+): Promise<{ discussion: Discussion }> {
+  const params = new URLSearchParams({
+    id: String(id),
+    topic: fields.topic,
+    category: fields.category,
+    resolved: fields.resolved ? "1" : "0",
+  });
+  if (fields.assigneeId != null) params.set("assigneeId", String(fields.assigneeId));
+  const res = await fetch(`${API_BASE}/discussions?${params}`, {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Failed to update discussion");
+  return data;
+}
+
+export async function deleteDiscussion(
+  token: string,
+  id: number,
+): Promise<{ success: boolean }> {
+  const res = await fetch(`${API_BASE}/discussions?id=${id}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Failed to delete discussion");
+  return data;
+}
+
+export async function fetchDiscussionMessageAudio(
+  token: string,
+  messageId: number,
+): Promise<Blob | null> {
+  const res = await fetch(`${API_BASE}/discussion-messages?id=${messageId}&audio=1`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
+  });
+  if (res.status === 404 || !res.ok) return null;
+  return await res.blob();
+}
+
+export async function getDiscussionMessages(
+  token: string,
+  discussionId: number,
+): Promise<DiscussionMessage[]> {
+  const res = await fetch(
+    `${API_BASE}/discussion-messages?discussionId=${discussionId}`,
+    { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" },
+  );
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Failed to fetch messages");
+  const messages = data.messages as Omit<DiscussionMessage, "audio">[];
+  return Promise.all(
+    messages.map(async (m) => ({
+      ...m,
+      audio: m.hasAudio ? await fetchDiscussionMessageAudio(token, m.id) : null,
+    })),
+  );
+}
+
+export async function createDiscussionMessage(
+  token: string,
+  discussionId: number,
+  content: MessageContent,
+  links: MessageAudioLink[] = [],
+): Promise<{ message: DiscussionMessage }> {
+  const params = new URLSearchParams({ discussionId: String(discussionId) });
+  const { headers, body } = buildMessageRequest(token, params, content, links);
+  const res = await fetch(`${API_BASE}/discussion-messages?${params}`, {
+    method: "POST",
+    headers,
+    body,
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Failed to post message");
+  return data;
+}
+
+export async function updateDiscussionMessage(
+  token: string,
+  id: number,
+  content: MessageContent,
+  links: MessageAudioLink[] = [],
+): Promise<{ message: DiscussionMessage }> {
+  const params = new URLSearchParams({ id: String(id) });
+  const { headers, body } = buildMessageRequest(token, params, content, links);
+  const res = await fetch(`${API_BASE}/discussion-messages?${params}`, {
+    method: "PUT",
+    headers,
+    body,
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Failed to update message");
+  return data;
+}
+
+export async function deleteDiscussionMessage(
+  token: string,
+  id: number,
+): Promise<{ success: boolean }> {
+  const res = await fetch(`${API_BASE}/discussion-messages?id=${id}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Failed to delete message");
+  return data;
+}
+
 export async function createPassageVersion(
   token: string,
   passageId: number,

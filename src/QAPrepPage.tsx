@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState, type MouseEvent } from 
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   Backdrop,
+  Badge,
   Box,
   Button,
   CircularProgress,
@@ -14,7 +15,7 @@ import {
   Typography,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
-import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
+import ForumIcon from "@mui/icons-material/Forum";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
@@ -50,11 +51,12 @@ import {
   type PassageVersion,
   type Question,
 } from "./api";
-import { type StepNavState } from "./steps";
+import { stepForRoute, type StepNavState } from "./steps";
 import { AudioPlayer, type AudioPlayerHandle } from "./AudioPlayer";
 import MiniAudioPlayer from "./MiniAudioPlayer";
 import { formatTime } from "./formatTime";
 import AddQuestionDialog from "./AddQuestionDialog";
+import DiscussionsFlyout from "./DiscussionsFlyout";
 
 /**
  * Thin wrapper that keys PassageProvider on passageId so its state resets
@@ -170,6 +172,8 @@ function QAPrepPageInner() {
   const [duration, setDuration] = useState(0);
   const [selection, setSelection] = useState<{ start: number; end: number } | null>(null);
   const [addQuestionOpen, setAddQuestionOpen] = useState(false);
+  const [discussionsOpen, setDiscussionsOpen] = useState(false);
+  const [discussionsUnread, setDiscussionsUnread] = useState(false);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [expandedGroupKey, setExpandedGroupKey] = useState<string | null>(null);
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
@@ -500,15 +504,24 @@ function QAPrepPageInner() {
         <IconButton
           variant="floating"
           sx={{ position: "absolute", bottom: 16, right: 16 }}
-          onClick={() => {
-            /* stub */
-          }}
+          onClick={() => setDiscussionsOpen(true)}
         >
-          <ChatBubbleOutlineIcon />
+          <Badge color="info" variant="dot" invisible={!discussionsUnread}>
+            <ForumIcon />
+          </Badge>
         </IconButton>
       </Box>
 
       <StepFooter canComplete onError={setSnackMsg} />
+
+      <DiscussionsFlyout
+        open={discussionsOpen}
+        onClose={() => setDiscussionsOpen(false)}
+        passageId={passage?.id ?? 0}
+        step={stepForRoute(location.pathname)?.id!}
+        passageAudio={passageAudio?.blob}
+        onUnreadChange={setDiscussionsUnread}
+      />
 
       {snackbarElement}
 

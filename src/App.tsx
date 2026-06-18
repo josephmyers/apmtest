@@ -39,7 +39,7 @@ declare module "@mui/material/Button" {
 
 declare module "@mui/material/IconButton" {
   interface IconButtonOwnProps {
-    variant?: "floating" | "primary";
+    variant?: "floating" | "primary" | "outlined";
   }
 }
 
@@ -61,6 +61,7 @@ const theme = createTheme({
     },
     neutral: {
       main: "#000000",
+      light: "#f8f8f8"
     },
   } as any,
   typography: {
@@ -137,7 +138,7 @@ const theme = createTheme({
       styleOverrides: {
         root: {
           borderRadius: "8px",
-          borderColor: "rgba(0, 0, 0, .2)",
+          borderColor: "rgba(0, 0, 0, .23)",
           "&::before": {
             display: "none",
           },
@@ -181,7 +182,7 @@ const theme = createTheme({
       variants: [
         {
           props: { variant: "floating" },
-          style: {
+          style: ({ theme }) => ({
             width: 56,
             height: 56,
             border: "1px solid",
@@ -189,13 +190,13 @@ const theme = createTheme({
             backgroundColor: "#ffffff",
             borderRadius: "8px",
             boxShadow: "0px 4px 12px rgba(0, 0, 0, 0.15)",
-            color: "rgba(0, 0, 0, 0.5)",
+            color: theme.palette.grey[700],
             transition: "all 0.2s ease-in-out",
             "&:hover": {
               backgroundColor: "#f5f5f5",
               boxShadow: "0px 6px 16px rgba(0, 0, 0, 0.2)",
             },
-          },
+          }),
         },
         {
           props: { variant: "primary" },
@@ -208,6 +209,14 @@ const theme = createTheme({
             "&:disabled": {
               background: "#f0f0f0",
             },
+          },
+        },
+        {
+          props: { variant: "outlined" },
+          style: {
+            border: "1px solid",
+            borderColor: "rgba(0, 0, 0, .23)",
+            borderRadius: 8,
           },
         },
       ],

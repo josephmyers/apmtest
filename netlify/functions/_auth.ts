@@ -167,6 +167,13 @@ export async function deleteAudioBlobsForPassages(
     JOIN questions q ON a.question_id = q.id
     WHERE q.passage_id = ANY(${passageIds})
   `;
+  // A message's own audio blob is owned here. Its `links` reference other
+  // passages' audio, so those keys are deliberately not collected.
+  const discussionMessageRows = await sql`
+    SELECT m.audio_key FROM discussion_messages m
+    JOIN discussions d ON m.discussion_id = d.id
+    WHERE d.passage_id = ANY(${passageIds})
+  `;
 
   const keys = new Set<string>();
   for (const r of passageRows) {
@@ -177,6 +184,7 @@ export async function deleteAudioBlobsForPassages(
   for (const r of replacementRows) if (r.audio_key) keys.add(r.audio_key as string);
   for (const r of questionRows) if (r.audio_key) keys.add(r.audio_key as string);
   for (const r of answerRows) if (r.audio_key) keys.add(r.audio_key as string);
+  for (const r of discussionMessageRows) if (r.audio_key) keys.add(r.audio_key as string);
 
   await Promise.all(
     Array.from(keys).map((k) =>

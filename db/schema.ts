@@ -4,6 +4,7 @@ import { boolean, doublePrecision, integer, jsonb, pgTable, varchar, text, times
 export const teams = pgTable('teams', {
     id: serial('id').primaryKey(),
     name: varchar('name', { length: 255 }).notNull(),
+    categories: varchar('categories', { length: 255 }).array().notNull().default(sql`'{}'::varchar[]`),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 });
 
@@ -88,5 +89,34 @@ export const answers = pgTable('answers', {
     questionId: integer('question_id').notNull().unique().references(() => questions.id, { onDelete: 'cascade' }),
     speaker: varchar('speaker', { length: 255 }).notNull().default(''),
     audioKey: varchar('audio_key', { length: 255 }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+});
+
+// A discussion thread, scoped to a (passage, step). Anyone with passage access
+// can view and reply. `read_by` holds the user ids who have read the thread in
+// its current state (cleared to the author on each new message).
+export const discussions = pgTable('discussions', {
+    id: serial('id').primaryKey(),
+    passageId: integer('passage_id').notNull().references(() => passages.id, { onDelete: 'cascade' }),
+    step: integer('step').notNull(),
+    topic: varchar('topic', { length: 255 }).notNull(),
+    category: varchar('category', { length: 255 }).notNull().default(''),
+    assigneeId: integer('assignee_id').references(() => users.id, { onDelete: 'set null' }),
+    resolved: boolean('resolved').notNull().default(false),
+    readBy: integer('read_by').array().notNull().default(sql`'{}'::int[]`),
+    createdBy: integer('created_by').notNull().references(() => users.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+});
+
+// One message in a thread; the opening message is the first row. Exactly one of
+// `body` / `audio_key` is set (enforced in the API). `links` is a JSONB array of
+// references to other audio — see MessageAudioLink in the frontend.
+export const discussionMessages = pgTable('discussion_messages', {
+    id: serial('id').primaryKey(),
+    discussionId: integer('discussion_id').notNull().references(() => discussions.id, { onDelete: 'cascade' }),
+    authorId: integer('author_id').notNull().references(() => users.id),
+    body: text('body'),
+    audioKey: varchar('audio_key', { length: 255 }),
+    links: jsonb('links').notNull().default(sql`'[]'::jsonb`),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 });
