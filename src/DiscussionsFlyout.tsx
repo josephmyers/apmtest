@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Autocomplete,
   Box,
@@ -42,6 +42,8 @@ import {
 } from "./api";
 import { AudioPlayer } from "./AudioPlayer";
 import MiniAudioPlayer from "./MiniAudioPlayer";
+import RadialAudioPlayer from "./RadialAudioPlayer";
+import { clipAudio } from "./audioUtils";
 import { formatTime } from "./formatTime";
 import DiscussionComposer from "./DiscussionComposer";
 import EmailAvatar from "./EmailAvatar";
@@ -62,6 +64,26 @@ const formatTenths = (seconds: number): string => {
   const m = Math.floor(seconds / 60);
   const s = (seconds - m * 60).toFixed(1).padStart(4, "0");
   return `${m}:${s}`;
+};
+
+// Parse a clock-style timestamp ("M:SS", "M:SS.s", or "H:MM:SS[.s]") to seconds,
+// or null when the text isn't such a timestamp (a bare number won't match).
+const parseClockTime = (raw: string): number | null => {
+  if (!/^\d+(:\d{1,2})+(\.\d+)?$/.test(raw)) return null;
+  return raw.split(":").reduce((acc, part) => acc * 60 + parseFloat(part), 0);
+};
+
+// Interpret a topic shaped like "start – end" (e.g. "1:15.4 – 1:20.0", however
+// the dash is typed) as a time range. Returns null unless both sides are valid
+// timestamps with start before end, so ordinary topics never match — including
+// ones a user later edits into the range format.
+const parseTimeRange = (topic: string): { start: number; end: number } | null => {
+  const parts = topic.split(/\s*[-–—]\s*/);
+  if (parts.length !== 2) return null;
+  const start = parseClockTime(parts[0].trim());
+  const end = parseClockTime(parts[1].trim());
+  if (start === null || end === null || start >= end) return null;
+  return { start, end };
 };
 
 // A message's timestamp: clock time for today (e.g. "10:55 AM"), otherwise the
@@ -397,6 +419,7 @@ export default function DiscussionsFlyout({
                   discussion={d}
                   token={token}
                   currentUserId={user?.id ?? null}
+                  passageAudio={passageAudio}
                   onMenu={(anchorEl, discussion) => setMenu({ anchorEl, discussion })}
                   onRead={markRead}
                 />
@@ -429,12 +452,14 @@ function Discussion({
   discussion,
   token,
   currentUserId,
+  passageAudio,
   onMenu,
   onRead,
 }: {
   discussion: Discussion;
   token: string | null;
   currentUserId: number | null;
+  passageAudio?: Blob;
   onMenu: (anchorEl: HTMLElement, d: Discussion) => void;
   onRead: (id: number) => void;
 }) {
@@ -443,7 +468,21 @@ function Discussion({
   const [loading, setLoading] = useState(false);
   const [replyText, setReplyText] = useState("");
   const [replyAudio, setReplyAudio] = useState<Blob | null>(null);
-  const [playingId, setPlayingId] = useState<number | null>(null);
+
+  // If the topic is a time range, clip the passage to it in the background.
+  const range = useMemo(() => parseTimeRange(discussion.topic), [discussion.topic]);
+  const [clip, setClip] = useState<Blob | null>(null);
+  useEffect(() => {
+    if (!range || !passageAudio) {
+      setClip(null);
+      return;
+    }
+    let cancelled = false;
+    clipAudio(passageAudio, range.start, range.end)
+      .then((b) => { if (!cancelled) setClip(b.size > 0 ? b : null); })
+      .catch(() => { if (!cancelled) setClip(null); });
+    return () => { cancelled = true; };
+  }, [range, passageAudio]);
 
   const toggle = () => {
     const next = !expanded;
@@ -501,6 +540,14 @@ function Discussion({
         {discussion.unread && (
           <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "info.main", flexShrink: 0 }} />
         )}
+        {clip && (
+          <Box
+            sx={{ display: "flex", justifyContent: "center" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <RadialAudioPlayer audio={clip} size={24} />
+          </Box>
+        )}
         <Typography
           variant="subtitle2"
           sx={{ fontWeight: discussion.unread ? 700 : 500 }}
@@ -546,8 +593,6 @@ function Discussion({
                   message={m}
                   isOwn={m.authorId === currentUserId}
                   isTopicAuthor={m.authorId === messages[0].authorId}
-                  playing={playingId === m.id}
-                  onPlayingChange={(p) => setPlayingId(p ? m.id : null)}
                   onDelete={() => removeMessage(m)}
                 />
               ))}
@@ -577,16 +622,12 @@ function MessageRow({
   canDelete,
   isOwn,
   isTopicAuthor,
-  playing,
-  onPlayingChange,
   onDelete,
 }: {
   message: DiscussionMessage;
   canDelete: boolean;
   isOwn: boolean;
   isTopicAuthor: boolean;
-  playing: boolean;
-  onPlayingChange: (playing: boolean) => void;
   onDelete: () => void;
 }) {
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
@@ -637,7 +678,7 @@ function MessageRow({
       )}
       {message.audio && (
         <Box sx={{ ml: -1, mr: 1 }}>
-          <MiniAudioPlayer audio={message.audio} playing={playing} onPlayingChange={onPlayingChange} />
+          <MiniAudioPlayer audio={message.audio} />
         </Box>
       )}
       {message.links.length > 0 && (

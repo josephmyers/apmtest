@@ -43,6 +43,7 @@ import {
   createWaveformRenderer,
   disableProgressSplit,
 } from "./waveformRenderer";
+import { audioManager, type AudioHandle } from "./audioManager";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -92,8 +93,6 @@ export interface AudioPlayerProps {
   onReady?: (duration: number) => void;
   /** Called when a recording completes (provides the recorded Blob) */
   onRecordingComplete?: (blob: Blob) => void;
-  /** Called when playback starts or stops */
-  onPlayingChange?: (playing: boolean) => void;
   /** Called once when playback reaches the end of the clip. */
   onFinish?: () => void;
 
@@ -212,7 +211,6 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
       stickySelection,
       shouldStopAfterStickySelection = true,
       onRecordingComplete,
-      onPlayingChange,
       onFinish,
       onAudioChange,
       highlights = [],
@@ -311,10 +309,14 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
     useEffect(() => {
       onRecordingCompleteRef.current = onRecordingComplete;
     }, [onRecordingComplete]);
-    const onPlayingChangeRef = useRef(onPlayingChange);
-    useEffect(() => {
-      onPlayingChangeRef.current = onPlayingChange;
-    }, [onPlayingChange]);
+    const selfHandleRef = useRef<AudioHandle>({
+      play: () => setPlaying(true),
+      pause: () => setPlaying(false),
+      stop: () => {
+        setPlaying(false);
+        wsRef.current?.setTime(0);
+      },
+    });
     const onFinishRef = useRef(onFinish);
     useEffect(() => {
       onFinishRef.current = onFinish;
@@ -390,7 +392,7 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
     // Imperative handle
     useImperativeHandle(ref, () => ({
       setTime: (t: number) => wsRef.current?.setTime(t),
-      play: () => setPlaying(true),
+      play: () => audioManager.play(selfHandleRef.current),
       pause: () => setPlaying(false),
       get container() {
         return containerRef.current;
@@ -752,13 +754,22 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
       const ws = wsRef.current;
       if (!ws) return;
       playing ? ws.play() : ws.pause();
-      onPlayingChangeRef.current?.(playing);
+      if (!playing) audioManager.release(selfHandleRef.current);
     }, [playing]);
+
+    // Release on unmount so a player that unmounts mid-playback frees the slot.
+    useEffect(() => {
+      const handle = selfHandleRef.current;
+      return () => audioManager.release(handle);
+    }, []);
 
     /* ----- Render ----- */
     const hasLoadedAudio = duration > 0;
 
-    const handlePlayToggle = () => setPlaying((p) => !p);
+    const handlePlayToggle = () => {
+      if (playing) setPlaying(false);
+      else audioManager.play(selfHandleRef.current);
+    };
 
     const handleStartRec = async () => {
       try {

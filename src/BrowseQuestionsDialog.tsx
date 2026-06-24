@@ -33,16 +33,6 @@ export default function BrowseQuestionsDialog({
   onSelectQuestion,
 }: BrowseQuestionsDialogProps) {
   const [unansweredOnly, setUnansweredOnly] = useState(false);
-  const [playingAudio, setPlayingAudio] = useState<HTMLAudioElement | null>(null);
-
-  const onAnswerPlay = (el: HTMLAudioElement | null) => {
-    if (el) {
-      if (playingAudio && playingAudio !== el) playingAudio.pause();
-      setPlayingAudio(el);
-    } else {
-      setPlayingAudio(null);
-    }
-  };
 
   const rows = questions
     .map((q, i) => ({ q, i }))
@@ -126,11 +116,7 @@ export default function BrowseQuestionsDialog({
                 sx={{ display: "flex", justifyContent: "center" }}
               >
                 {answer && (
-                  <RadialAudioPlayer
-                    audio={answer.audio}
-                    size={28}
-                    onPlayingChange={onAnswerPlay}
-                  />
+                  <RadialAudioPlayer audio={answer.audio} size={28} />
                 )}
               </Box>
             </Box>

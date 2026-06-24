@@ -9,7 +9,6 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  IconButton,
   List,
   ListItemButton,
   ListItemText,
@@ -17,9 +16,10 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { ExpandMore, PlayCircleOutline, PriorityHigh, StopCircleOutlined } from "@mui/icons-material";
+import { ExpandMore, PriorityHigh } from "@mui/icons-material";
 
 import { AudioPlayer, type AudioPlayerHandle } from "./AudioPlayer";
+import RadialAudioPlayer from "./RadialAudioPlayer";
 import {
   mapPreviewTimeToOriginalTime,
   replaceAudioSegment,
@@ -85,8 +85,6 @@ export default function AddReplacementDialog({
   );
   const [historyExpanded, setHistoryExpanded] = useState(false);
   const [hasOpenedHistory, setHasOpenedHistory] = useState(false);
-  const [playingHistoryId, setPlayingHistoryId] = useState<number | null>(null);
-  const historyAudioRef = useRef<HTMLAudioElement | null>(null);
   const [replacementAudio, setReplacementAudio] = useState<Blob | null>(null);
   const [appliedReplacementAudio, setAppliedReplacementAudio] =
     useState<Blob | null>(null);
@@ -359,52 +357,30 @@ export default function AddReplacementDialog({
           </AccordionSummary>
             <AccordionDetails sx={{ p: 0 }}>
               <List dense disablePadding sx={{ height: 100, overflowY: "auto" }}>
-                {previousRecordings.map((r) => {
-                  const isPlaying = playingHistoryId === r.id;
-                  return (
-                    <ListItemButton
-                      key={r.id}
-                      selected={selectedHistoryId === r.id}
-                      onClick={() => {
-                        setSelectedHistoryId(r.id);
-                        setTitle(r.title);
-                        setNote(r.note);
-                        setName(r.name);
-                        setReplacementAudio(r.audio);
-                      }}
-                      sx={{ height: 36, p: 0 }}
+                {previousRecordings.map((r) => (
+                  <ListItemButton
+                    key={r.id}
+                    selected={selectedHistoryId === r.id}
+                    onClick={() => {
+                      setSelectedHistoryId(r.id);
+                      setTitle(r.title);
+                      setNote(r.note);
+                      setName(r.name);
+                      setReplacementAudio(r.audio);
+                    }}
+                    sx={{ height: 36, p: 0 }}
+                  >
+                    <Box
+                      sx={{ display: "flex", flexShrink: 0, mx: 1.5 }}
+                      onClick={(e) => e.stopPropagation()}
                     >
-                      <IconButton
-                        size="small"
-                        sx={{ width: 36, height: 36, flexShrink: 0, mx: 0.5 }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (isPlaying) {
-                            historyAudioRef.current?.pause();
-                            historyAudioRef.current = null;
-                            setPlayingHistoryId(null);
-                          } else {
-                            historyAudioRef.current?.pause();
-                            const url = URL.createObjectURL(r.audio);
-                            const audio = new Audio(url);
-                            audio.onended = () => {
-                              URL.revokeObjectURL(url);
-                              setPlayingHistoryId(null);
-                            };
-                            historyAudioRef.current = audio;
-                            setPlayingHistoryId(r.id);
-                            audio.play();
-                          }
-                        }}
-                      >
-                        {isPlaying ? <StopCircleOutlined fontSize="small" /> : <PlayCircleOutline fontSize="small" />}
-                      </IconButton>
-                      <ListItemText
-                        primary={`${r.title}${r.note ? ` — ${r.note}` : ""}`}
-                      />
-                    </ListItemButton>
-                  );
-                })}
+                      <RadialAudioPlayer audio={r.audio} size={22} />
+                    </Box>
+                    <ListItemText
+                      primary={`${r.title}${r.note ? ` — ${r.note}` : ""}`}
+                    />
+                  </ListItemButton>
+                ))}
               </List>
             </AccordionDetails>
         </Accordion>

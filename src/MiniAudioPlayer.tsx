@@ -3,16 +3,13 @@ import { Box, IconButton, Slider, Stack, Typography } from "@mui/material";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import PauseIcon from "@mui/icons-material/Pause";
 import { formatTime } from "./formatTime";
+import { audioManager, type AudioHandle } from "./audioManager";
 
 interface MiniAudioPlayerProps {
   /** The clip to play */
   audio: Blob;
   /** Rendered top-left, above the slider (e.g. title + edit button) */
   label?: React.ReactNode;
-  /** Controlled play state */
-  playing: boolean;
-  /** When the play state changes */
-  onPlayingChange: (playing: boolean) => void;
 }
 
 /**
@@ -20,21 +17,12 @@ interface MiniAudioPlayerProps {
  * slider that both shows and controls the playhead, and a current/duration
  * readout. Unlike AudioPlayer this uses a plain HTMLAudioElement — no waveform.
  */
-export default function MiniAudioPlayer({
-  audio,
-  label,
-  playing,
-  onPlayingChange,
-}: MiniAudioPlayerProps) {
+export default function MiniAudioPlayer({ audio, label }: MiniAudioPlayerProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const handleRef = useRef<AudioHandle | null>(null);
+  const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-
-  // Latest callback for the once-per-clip `ended` listener.
-  const onPlayingChangeRef = useRef(onPlayingChange);
-  useEffect(() => {
-    onPlayingChangeRef.current = onPlayingChange;
-  }, [onPlayingChange]);
 
   // (Re)create the element whenever the clip changes. Cleanup pauses and frees
   // the object URL — this also stops playback when the row unmounts (group
@@ -43,6 +31,16 @@ export default function MiniAudioPlayer({
     const url = URL.createObjectURL(audio);
     const el = new Audio(url);
     audioRef.current = el;
+    const handle: AudioHandle = {
+      play: () => el.play(),
+      pause: () => el.pause(),
+      stop: () => {
+        el.pause();
+        el.currentTime = 0;
+      },
+    };
+    handleRef.current = handle;
+    setPlaying(false);
     setCurrentTime(0);
     setDuration(0);
 
@@ -59,26 +57,42 @@ export default function MiniAudioPlayer({
       .catch(() => {});
 
     const onTime = () => setCurrentTime(el.currentTime);
-    const onEnded = () => onPlayingChangeRef.current(false);
+    const onPlay = () => setPlaying(true);
+    const onPause = () => {
+      setPlaying(false);
+      audioManager.release(handle);
+    };
+    // `ended` leaves the element paused but doesn't always emit `pause`, so
+    // release explicitly; `release` is a no-op if we're not the active player.
+    const onEnded = () => {
+      setPlaying(false);
+      audioManager.release(handle);
+    };
     el.addEventListener("timeupdate", onTime);
+    el.addEventListener("play", onPlay);
+    el.addEventListener("pause", onPause);
     el.addEventListener("ended", onEnded);
 
     return () => {
       cancelled = true;
       el.pause();
+      audioManager.release(handle);
       el.removeEventListener("timeupdate", onTime);
+      el.removeEventListener("play", onPlay);
+      el.removeEventListener("pause", onPause);
       el.removeEventListener("ended", onEnded);
       URL.revokeObjectURL(url);
       audioRef.current = null;
     };
   }, [audio]);
 
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    if (playing) audio.play();
-    else audio.pause();
-  }, [playing]);
+  const togglePlay = () => {
+    const el = audioRef.current;
+    const handle = handleRef.current;
+    if (!el || !handle) return;
+    if (el.paused) audioManager.play(handle);
+    else el.pause();
+  };
 
   const handleSeek = (_: Event, value: number | number[]) => {
     const audio = audioRef.current;
@@ -89,7 +103,7 @@ export default function MiniAudioPlayer({
 
   return (
     <Stack direction="row" alignItems="center" spacing={1}>
-      <IconButton onClick={() => onPlayingChange(!playing)} sx={{ p: 0 }}>
+      <IconButton onClick={togglePlay} sx={{ p: 0 }}>
         {playing ? (
           <PauseIcon fontSize="large" />
         ) : (

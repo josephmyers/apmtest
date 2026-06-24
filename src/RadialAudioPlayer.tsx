@@ -2,10 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import { Box, CircularProgress, IconButton } from "@mui/material";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import PauseIcon from "@mui/icons-material/Pause";
+import { audioManager, type AudioHandle } from "./audioManager";
 
 interface RadialAudioPlayerProps {
   audio: Blob;
-  onPlayingChange: (playingAudio: HTMLAudioElement | null) => void;
+  onPlayingChange?: (playing: boolean) => void;
   disabled?: boolean;
   size?: number;
 }
@@ -20,6 +21,7 @@ export default function RadialAudioPlayer({
   size = 38,
 }: RadialAudioPlayerProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const handleRef = useRef<AudioHandle | null>(null);
   const [playing, setPlaying] = useState(false);
   // 0–100 playback progress.
   const [progress, setProgress] = useState(0);
@@ -33,17 +35,33 @@ export default function RadialAudioPlayer({
     const url = URL.createObjectURL(audio);
     const el = new Audio(url);
     audioRef.current = el;
+    const handle: AudioHandle = {
+      play: () => el.play(),
+      stop: () => {
+        el.pause();
+        el.currentTime = 0;
+      },
+    };
+    handleRef.current = handle;
     setPlaying(false);
     setProgress(0);
 
     const onTime = () => {
       setProgress(el.duration ? (el.currentTime / el.duration) * 100 : 0);
     };
-    const onPlay = () => setPlaying(true);
-    const onPause = () => setPlaying(false);
+    const onPlay = () => {
+      setPlaying(true);
+      onPlayingChangeRef.current?.(true);
+    };
+    const onPause = () => {
+      setPlaying(false);
+      audioManager.release(handle);
+      onPlayingChangeRef.current?.(false);
+    };
     const onEnded = () => {
       setPlaying(false);
-      onPlayingChangeRef.current(null);
+      audioManager.release(handle);
+      onPlayingChangeRef.current?.(false);
     };
     el.addEventListener("timeupdate", onTime);
     el.addEventListener("play", onPlay);
@@ -52,6 +70,7 @@ export default function RadialAudioPlayer({
 
     return () => {
       el.pause();
+      audioManager.release(handle);
       el.removeEventListener("timeupdate", onTime);
       el.removeEventListener("play", onPlay);
       el.removeEventListener("pause", onPause);
@@ -63,14 +82,10 @@ export default function RadialAudioPlayer({
 
   const toggle = () => {
     const el = audioRef.current;
-    if (!el) return;
-    if (el.paused) {
-      el.play();
-      onPlayingChange(el);
-    } else {
-      el.pause();
-      onPlayingChange(null);
-    }
+    const handle = handleRef.current;
+    if (!el || !handle) return;
+    if (el.paused) audioManager.play(handle);
+    else audioManager.stop();
   };
 
   return (

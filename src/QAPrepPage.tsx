@@ -54,6 +54,7 @@ import {
 import { stepForRoute, type StepNavState } from "./steps";
 import { AudioPlayer, type AudioPlayerHandle } from "./AudioPlayer";
 import MiniAudioPlayer from "./MiniAudioPlayer";
+import { audioManager, useIsAudioPlaying } from "./audioManager";
 import { formatTime } from "./formatTime";
 import AddQuestionDialog from "./AddQuestionDialog";
 import DiscussionsFlyout from "./DiscussionsFlyout";
@@ -93,15 +94,11 @@ function byDisplayOrder(a: Question, b: Question): number {
 function SortableQuestionRow({
   q,
   showDragHandle,
-  playing,
-  onPlayingChange,
   onEdit,
   onDelete,
 }: {
   q: Question;
   showDragHandle: boolean;
-  playing: boolean;
-  onPlayingChange: (playing: boolean) => void;
   onEdit: () => void;
   onDelete: () => void;
 }) {
@@ -134,8 +131,6 @@ function SortableQuestionRow({
       <Box sx={{ flex: 1, minWidth: 0 }}>
         <MiniAudioPlayer
           audio={q.audio}
-          playing={playing}
-          onPlayingChange={onPlayingChange}
           label={
             <Stack direction="row" alignItems="center" spacing={0.5}>
               <Typography variant="body2" noWrap>
@@ -177,8 +172,7 @@ function QAPrepPageInner() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [expandedGroupKey, setExpandedGroupKey] = useState<string | null>(null);
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
-  // The audio that's currently playing
-  const [playingAudio, setPlayingAudio] = useState<Blob | null>(null);
+  const isAudioPlaying = useIsAudioPlaying();
 
   // Grouped view of `questions`. Display-only.
   const groups = useMemo<QuestionGroup[]>(() => {
@@ -244,7 +238,7 @@ function QAPrepPageInner() {
   }, [expandedGroupKey]);
 
   const selectGroup = (group: QuestionGroup) => {
-    setPlayingAudio(null);
+    audioManager.stop();
     setExpandedGroupKey(group.key);
     if (group.start !== group.end) {
       passageAudioRef.current?.updateSelection({ start: group.start, end: group.end });
@@ -320,7 +314,7 @@ function QAPrepPageInner() {
       fullWidth
       startIcon={<AddIcon />}
       sx={{ mb: 2 }}
-      disabled={!!playingAudio || !passageAudio}
+      disabled={isAudioPlaying || !passageAudio}
       onClick={() => setAddQuestionOpen(true)}
     >
         Add Question...
@@ -379,13 +373,6 @@ function QAPrepPageInner() {
               }
             }
             setSelection(current);
-          }}
-          onPlayingChange={(playing) => {
-            if (playing) {
-              setPlayingAudio(passageAudio?.blob ?? null);
-            } else if (playingAudio === passageAudio?.blob) {
-              setPlayingAudio(null);
-            }
           }}
         />
       </Box>
@@ -456,15 +443,6 @@ function QAPrepPageInner() {
                               key={q.id}
                               q={q}
                               showDragHandle={group.questions.length > 1}
-                              playing={playingAudio === q.audio}
-                              onPlayingChange={(playing) => {
-                                if (playing) {
-                                  passageAudioRef.current?.pause();
-                                  setPlayingAudio(q.audio);
-                                } else {
-                                  setPlayingAudio(null);
-                                }
-                              }}
                               onEdit={() => setEditingQuestion(q)}
                               onDelete={() => handleDeleteQuestion(q)}
                             />
@@ -475,7 +453,7 @@ function QAPrepPageInner() {
                         <Button
                           fullWidth
                           startIcon={<AddIcon />}
-                          disabled={!!playingAudio || !passageAudio}
+                          disabled={isAudioPlaying || !passageAudio}
                           onClick={() => setAddQuestionOpen(true)}
                         >
                           Add Question...

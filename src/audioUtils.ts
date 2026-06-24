@@ -59,6 +59,52 @@ export async function spliceAudio(
 }
 
 /**
+ * Extract a time range from an audio Blob, returning a new WAV Blob containing
+ * only the segment between `startSec` and `endSec` (the complement of
+ * `spliceAudio`). The range is clamped to the audio; an empty range yields an
+ * empty Blob. Preserves all channels and sample rate.
+ */
+export async function clipAudio(
+  blob: Blob,
+  startSec: number,
+  endSec: number,
+): Promise<Blob> {
+  const arrayBuffer = await blob.arrayBuffer();
+  const audioCtx = new AudioContext();
+  const decoded = await audioCtx.decodeAudioData(arrayBuffer);
+
+  const sampleRate = decoded.sampleRate;
+  const numChannels = decoded.numberOfChannels;
+  const totalSamples = decoded.length;
+  const startSample = Math.max(0, Math.min(totalSamples, Math.round(startSec * sampleRate)));
+  const endSample = Math.max(startSample, Math.min(totalSamples, Math.round(endSec * sampleRate)));
+  const newLength = endSample - startSample;
+
+  if (newLength <= 0) {
+    await audioCtx.close();
+    return new Blob([], { type: "audio/wav" });
+  }
+
+  const offlineCtx = new OfflineAudioContext(numChannels, newLength, sampleRate);
+  const newBuffer = offlineCtx.createBuffer(numChannels, newLength, sampleRate);
+
+  for (let ch = 0; ch < numChannels; ch++) {
+    const src = decoded.getChannelData(ch);
+    const dst = newBuffer.getChannelData(ch);
+    dst.set(src.subarray(startSample, endSample), 0);
+  }
+
+  const source = offlineCtx.createBufferSource();
+  source.buffer = newBuffer;
+  source.connect(offlineCtx.destination);
+  source.start();
+  const rendered = await offlineCtx.startRendering();
+  await audioCtx.close();
+
+  return audioBufferToWav(rendered);
+}
+
+/**
  * Insert a span of silence into an audio Blob at `atSec`.
  * Returns a new WAV Blob with all channels and sample rate preserved.
  */

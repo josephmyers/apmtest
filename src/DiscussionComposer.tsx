@@ -48,7 +48,6 @@ export default function DiscussionComposer({
   const recorderRef = useRef<VoiceRecorderHandle>(null);
   const [recording, setRecording] = useState(false);
   const [phase, setPhase] = useState<RecorderPhase>("warming");
-  const [playing, setPlaying] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
 
   if (recording) {
@@ -89,13 +88,12 @@ export default function DiscussionComposer({
       {audio ? (
         <Stack direction="row" alignItems="center" spacing={1}>
           <Box sx={{ flex: 1, minWidth: 0 }}>
-            <MiniAudioPlayer audio={audio} playing={playing} onPlayingChange={setPlaying} />
+            <MiniAudioPlayer audio={audio} />
           </Box>
           <IconButton
             aria-label="delete recording"
             variant="outlined"
             onClick={() => {
-              setPlaying(false);
               onAudioChange(null);
             }}
           >

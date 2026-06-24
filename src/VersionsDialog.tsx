@@ -21,6 +21,7 @@ import StopCircleOutlinedIcon from "@mui/icons-material/StopCircleOutlined";
 import DownloadIcon from "@mui/icons-material/Download";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import { activateVersion, fetchVersionAudio, type PassageVersion } from "./api";
+import { audioManager, type AudioHandle } from "./audioManager";
 
 export interface UseVersionResult {
   version: PassageVersion;
@@ -128,7 +129,6 @@ export default function VersionsDialog({
     }
 
     try {
-      stop();
       const blob = await fetchVersionAudio(token, version.id);
       if (!blob) {
         onMessage("Could not load audio for this version.");
@@ -137,14 +137,26 @@ export default function VersionsDialog({
 
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
-      previewAudioRef.current = audio;
-      audio.onended = () => {
-        URL.revokeObjectURL(audio.src);
-        previewAudioRef.current = null;
-        setPreviewPlayingVersionId(null);
+      const handle: AudioHandle = {
+        play: () => audio.play(),
+        stop: () => {
+          audio.pause();
+          audio.currentTime = 0;
+        },
       };
+      const cleanup = () => {
+        URL.revokeObjectURL(url);
+        if (previewAudioRef.current === audio) {
+          previewAudioRef.current = null;
+          setPreviewPlayingVersionId(null);
+        }
+        audioManager.release(handle);
+      };
+      audio.addEventListener("pause", cleanup);
+      audio.addEventListener("ended", cleanup);
+      previewAudioRef.current = audio;
       setPreviewPlayingVersionId(version.id);
-      await audio.play();
+      audioManager.play(handle);
     } catch {
       onMessage("Could not play this version.");
       stop();
@@ -171,12 +183,7 @@ export default function VersionsDialog({
   }
 
   function stop() {
-    if (previewAudioRef.current) {
-      URL.revokeObjectURL(previewAudioRef.current.src);
-      previewAudioRef.current.pause();
-      previewAudioRef.current = null;
-    }
-    setPreviewPlayingVersionId(null);
+    previewAudioRef.current?.pause();
   }
 
   async function download(version: PassageVersion) {

@@ -38,6 +38,7 @@ import { AudioPlayer, type AudioPlayerHandle } from "./AudioPlayer";
 import { formatTime } from "./formatTime";
 import RadialAudioPlayer from "./RadialAudioPlayer";
 import BrowseQuestionsDialog from "./BrowseQuestionsDialog";
+import { audioManager } from "./audioManager";
 
 /**
  * Thin wrapper that keys PassageProvider on passageId so its state resets
@@ -81,8 +82,6 @@ function QAPageInner() {
   // Question ids whose prompt the user has started playing (page lifetime).
   const [hasListenedToQuestion, setHasListenedToQuestion] = useState<Set<number>>(new Set());
 
-  // The audio currently playing
-  const [playingAudio, setPlayingAudio] = useState<{ pause: () => void } | null>(null);
 
   // Init
   useEffect(() => {
@@ -109,24 +108,13 @@ function QAPageInner() {
 
   const currentQuestion = questions[currentIndex];
 
-  const onPlay = (source: { pause: () => void } | null) => {
-    if (playingAudio) playingAudio.pause();
-    setPlayingAudio(source);
-  };
-
-  const onToggleQuestionPlay = (el: HTMLAudioElement | null) => {
-    if (el) {
-      onPlay(el);
-    } else {
-      setPlayingAudio(null);
-      setHasListenedToQuestion((prev) =>
-        prev.has(currentQuestion.id) ? prev : new Set(prev).add(currentQuestion.id),
-      );
-    }
-  };
+  const markQuestionListened = () =>
+    setHasListenedToQuestion((prev) =>
+      prev.has(currentQuestion.id) ? prev : new Set(prev).add(currentQuestion.id),
+    );
 
   const goToQuestion = (index: number) => {
-    onPlay(null);
+    audioManager.stop();
     setCurrentIndex(index);
 
     const q = questions[index];
@@ -143,7 +131,7 @@ function QAPageInner() {
     if (warmingUp || !canRecord) return;
     if (!recording) {
       try {
-        onPlay(null);
+        audioManager.stop();
 
         setWarmingUp(true);
         await answerRef.current?.startRecording();
@@ -248,13 +236,6 @@ function QAPageInner() {
             if (shouldStartQuestions) goToQuestion(0);
           }}
           enableDragSelection
-          onPlayingChange={(playing) => {
-            if (playing) {
-              onPlay(passageRef.current);
-            } else if (playingAudio === passageRef.current) {
-              setPlayingAudio(null);
-            }
-          }}
         />
       </Box>
 
@@ -286,7 +267,7 @@ function QAPageInner() {
           <Stack spacing={2} sx={{ mt: 1 }}>
             <Button
               onClick={() => {
-                onPlay(null);
+                audioManager.stop();
                 setQuestionsDialogOpen(true);
               }}
               sx={{ alignSelf: "center" }}
@@ -312,7 +293,9 @@ function QAPageInner() {
               </IconButton>
               <RadialAudioPlayer
                 audio={currentQuestion.audio}
-                onPlayingChange={onToggleQuestionPlay}
+                onPlayingChange={(playing) => {
+                  if (!playing) markQuestionListened();
+                }}
                 disabled={playDisabled}
               />
               <IconButton
@@ -361,13 +344,6 @@ function QAPageInner() {
                 formatTimeDisplay={(currentTime, duration) =>
                   `${formatTime(currentTime)}/${formatTime(duration || 0)}`
                 }
-                onPlayingChange={(playing) => {
-                  if (playing) {
-                    onPlay(answerRef.current);
-                  } else if (playingAudio === answerRef.current) {
-                    setPlayingAudio(null);
-                  }
-                }}
                 onAudioChange={(blob) => setAnswer(currentQuestion.id, blob)}
                 menuItems={
                   <MenuItem onClick={() => fileInputRef.current?.click()}>
