@@ -580,17 +580,20 @@ export async function getReplacements(
   });
   const data = (await res.json()) as { replacements: ReplacementData[] };
   if (!res.ok) throw new Error("Failed to fetch replacements");
-  return Promise.all(
+  const replacements = await Promise.all(
     data.replacements.map(async (rd) => {
       const audio = await fetchReplacementAudio(token, rd.id);
-      return {
-        ...rd,
-        selection: { start: rd.selectionStart, end: rd.selectionEnd },
-        audio: audio!,
-        versionId: rd.versionId,
-      };
+      return audio
+        ? {
+            ...rd,
+            selection: { start: rd.selectionStart, end: rd.selectionEnd },
+            audio,
+            versionId: rd.versionId,
+          }
+        : null;
     }),
   );
+  return replacements.filter((r) => r !== null);
 }
 
 export async function fetchReplacementAudio(
@@ -728,12 +731,13 @@ export async function getQuestions(
     questions: Omit<Question, "audio">[];
   };
   if (!res.ok) throw new Error("Failed to fetch questions");
-  return Promise.all(
-    data.questions.map(async (q) => ({
-      ...q,
-      audio: (await fetchQuestionAudio(token, q.id))!,
-    })),
+  const questions = await Promise.all(
+    data.questions.map(async (q) => {
+      const audio = await fetchQuestionAudio(token, q.id);
+      return !!audio ? { ...q, audio } : null;
+    })
   );
+  return questions.filter(q => q !== null);
 }
 
 export async function fetchQuestionAudio(
@@ -769,12 +773,13 @@ export async function getAnswers(
     answers: { questionId: number; speaker: string }[];
   };
   if (!res.ok) throw new Error("Failed to fetch answers");
-  return Promise.all(
-    data.answers.map(async (a) => ({
-      ...a,
-      audio: (await fetchAnswerAudio(token, a.questionId))!,
-    })),
+  const answers = await Promise.all(
+    data.answers.map(async (a) => {
+      const audio = await fetchAnswerAudio(token, a.questionId);
+      return !!audio ? { ...a, audio } : null;
+    })
   );
+  return answers.filter(a => a !== null);
 }
 
 /**
@@ -858,12 +863,13 @@ export async function getPreservedReplacements(
   );
   const data = await res.json() as { replacements: { id: number; title: string; note: string; name: string }[] };
   if (!res.ok) throw new Error("Failed to fetch preserved replacements");
-  return Promise.all(
+  const replacements = await Promise.all(
     data.replacements.map(async (rd) => {
       const audio = await fetchReplacementAudio(token, rd.id);
-      return { ...rd, audio: audio! };
+      return audio ? { ...rd, audio } : null;
     }),
   );
+  return replacements.filter((r) => r !== null);
 }
 
 export async function updateReplacement(
