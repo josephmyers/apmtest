@@ -50,7 +50,7 @@ import EmailAvatar from "./EmailAvatar";
 
   /** The threads are scoped to passage+step. */
 interface DiscussionsFlyoutProps {
-  open: boolean;
+  open: boolean | { start: number; end: number };
   onClose: () => void;
   passageId: number;
   step: number;
@@ -158,7 +158,9 @@ export default function DiscussionsFlyout({
   }, [loadList]);
 
   useEffect(() => {
-    if (open) setView("list");
+    if (!open) return;
+    if (typeof open === "object") openCreate(open);
+    else setView("list");
   }, [open]);
 
   useEffect(() => {
@@ -177,9 +179,9 @@ export default function DiscussionsFlyout({
 
   // ─── Form ───────────────────────────────────────────────────────────────
 
-  const openCreate = () => {
+  const openCreate = (range = selection) => {
     setEditingId(null);
-    setTopic(selection ? `${formatTenths(selection.start)} – ${formatTenths(selection.end)}` : "");
+    setTopic(range ? `${formatTenths(range.start)} – ${formatTenths(range.end)}` : "");
     setAssignee("");
     setCategory("");
     setText("");
@@ -278,7 +280,8 @@ export default function DiscussionsFlyout({
   return (
     <Drawer
       anchor="right"
-      open={open}
+      open={!!open}
+      ModalProps={{ keepMounted: true }}
       onClose={(_e, reason) => {
         if (reason !== "escapeKeyDown") onClose();
       }}
@@ -302,7 +305,7 @@ export default function DiscussionsFlyout({
             <IconButton
               size="small"
               aria-label="back"
-              onClick={() => setView("list")}
+              onClick={() => (typeof open === "object" ? onClose() : setView("list"))}
               sx={{ px: "2px !important" }}
             >
               <ArrowBackIcon />
@@ -319,7 +322,7 @@ export default function DiscussionsFlyout({
               <IconButton size="small" aria-label="filter" onClick={() => {/* stub */}}>
                 <FilterListIcon />
               </IconButton>
-              <IconButton size="small" aria-label="add discussion" onClick={openCreate}>
+              <IconButton size="small" aria-label="add discussion" onClick={() => openCreate()}>
                 <AddIcon />
               </IconButton>
               <IconButton size="small" aria-label="close" onClick={onClose}>

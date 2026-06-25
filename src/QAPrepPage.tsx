@@ -167,7 +167,7 @@ function QAPrepPageInner() {
   const [duration, setDuration] = useState(0);
   const [selection, setSelection] = useState<{ start: number; end: number } | null>(null);
   const [addQuestionOpen, setAddQuestionOpen] = useState(false);
-  const [discussionsOpen, setDiscussionsOpen] = useState(false);
+  const [discussionsOpen, setDiscussionsOpen] = useState<boolean | { start: number; end: number }>(false);
   const [discussionsUnread, setDiscussionsUnread] = useState(false);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [expandedGroupKey, setExpandedGroupKey] = useState<string | null>(null);
@@ -479,15 +479,30 @@ function QAPrepPageInner() {
           )}
         </Box>
 
-        <IconButton
-          variant="floating"
-          sx={{ position: "absolute", bottom: 16, right: 16 }}
-          onClick={() => setDiscussionsOpen(true)}
-        >
-          <Badge color="info" variant="dot" invisible={!discussionsUnread}>
-            <ForumIcon />
-          </Badge>
-        </IconButton>
+        <Stack spacing={1} sx={{ position: "absolute", bottom: 16, right: 16 }}>
+          {selection && (
+            <IconButton
+              variant="floating"
+              onClick={() => setDiscussionsOpen(selection)}
+            >
+              <Badge
+                overlap="circular"
+                anchorOrigin={{ vertical: "top", horizontal: "right" }}
+                badgeContent={<AddIcon sx={{ fontSize: 20, ml: 1, mb: 1 }} />}
+              >
+                <ForumIcon />
+              </Badge>
+            </IconButton>
+          )}
+          <IconButton
+            variant="floating"
+            onClick={() => setDiscussionsOpen(true)}
+          >
+            <Badge color="info" variant="dot" invisible={!discussionsUnread}>
+              <ForumIcon />
+            </Badge>
+          </IconButton>
+        </Stack>
       </Box>
 
       <StepFooter canComplete onError={setSnackMsg} />
