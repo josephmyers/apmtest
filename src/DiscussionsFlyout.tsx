@@ -7,9 +7,12 @@ import {
   Collapse,
   Drawer,
   IconButton,
+  ListItemIcon,
+  ListItemText,
   MenuItem,
   Menu,
   Paper,
+  Radio,
   Stack,
   TextField,
   Typography,
@@ -48,7 +51,6 @@ import { formatTime } from "./formatTime";
 import DiscussionComposer from "./DiscussionComposer";
 import EmailAvatar from "./EmailAvatar";
 
-  /** The threads are scoped to passage+step. */
 interface DiscussionsFlyoutProps {
   open: boolean | { start: number; end: number };
   onClose: () => void;
@@ -57,6 +59,14 @@ interface DiscussionsFlyoutProps {
   passageAudio?: Blob;
   onUnreadChange?: (hasUnread: boolean) => void;
 }
+
+type SortKey = "topic" | "assignee" | "newest" | "oldest";
+const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: "topic", label: "Topic" },
+  { key: "assignee", label: "Assignee" },
+  { key: "newest", label: "Newest First" },
+  { key: "oldest", label: "Oldest First" },
+];
 
 // Format a time (in seconds) to a tenth of a second, e.g. 75.36 → "1:15.4".
 // Used to seed a new discussion's topic from the selected range.
@@ -74,9 +84,7 @@ const parseClockTime = (raw: string): number | null => {
 };
 
 // Interpret a topic shaped like "start – end" (e.g. "1:15.4 – 1:20.0", however
-// the dash is typed) as a time range. Returns null unless both sides are valid
-// timestamps with start before end, so ordinary topics never match — including
-// ones a user later edits into the range format.
+// the dash is typed) as a time range.
 const parseTimeRange = (topic: string): { start: number; end: number } | null => {
   const parts = topic.split(/\s*[-–—]\s*/);
   if (parts.length !== 2) return null;
@@ -106,10 +114,7 @@ const formatMessageTime = (iso: string): string => {
 };
 
 /**
- * Slide-out pane hosting the Discussions workflow for a (passage, step). Loads
- * threads from the backend on mount (so the launcher can badge unread even while
- * closed) and swaps between the thread list, the new/edit form, and a single
- * thread's message view without leaving the flyout.
+ * Slide-out pane hosting the Discussions workflow for a passage+step.
  */
 export default function DiscussionsFlyout({
   open,
@@ -128,6 +133,8 @@ export default function DiscussionsFlyout({
   const [selection, setSelection] = useState<{ start: number; end: number } | null>(null);
   // Open row-actions menu: the anchor element + the discussion it acts on.
   const [menu, setMenu] = useState<{ anchorEl: HTMLElement; discussion: Discussion } | null>(null);
+  const [sortBy, setSortBy] = useState<SortKey>("oldest");
+  const [sortAnchor, setSortAnchor] = useState<HTMLElement | null>(null);
 
   // New/edit thread form. `editingId` null = creating a new thread.
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -137,9 +144,17 @@ export default function DiscussionsFlyout({
   const [text, setText] = useState("");
   const [audio, setAudio] = useState<Blob | null>(null);
 
-  // Only unresolved threads are listed (resolved are filtered out per spec).
-  const visible = discussions.filter((d) => !d.resolved);
-  // Category suggestions are derived from existing threads.
+  const shownDiscussions = discussions
+    .filter((d) => !d.resolved)
+    .sort((a, b) => {
+      switch (sortBy) {
+        case "topic":    return a.topic.localeCompare(b.topic) || a.id - b.id;
+        case "assignee": return (a.assigneeEmail ?? "￿").localeCompare(b.assigneeEmail ?? "￿") || a.id - b.id;
+        case "newest":   return b.createdAt.localeCompare(a.createdAt) || b.id - a.id;
+        case "oldest":   return a.createdAt.localeCompare(b.createdAt) || a.id - b.id;
+      }
+    });
+
   const categoryOptions = Array.from(
     new Set(discussions.map((d) => d.category).filter(Boolean)),
   );
@@ -170,7 +185,7 @@ export default function DiscussionsFlyout({
   }, [open]);
 
   useEffect(() => {
-    onUnreadChange?.(visible.some((d) => d.unread));
+    onUnreadChange?.(shownDiscussions.some((d) => d.unread));
   }, [discussions]);
 
   useEffect(() => {
@@ -322,7 +337,7 @@ export default function DiscussionsFlyout({
           </Typography>
           {view === "list" && (
             <>
-              <IconButton size="small" onClick={() => {/* stub */}}>
+              <IconButton size="small" onClick={(e) => setSortAnchor(e.currentTarget)}>
                 <SortIcon />
               </IconButton>
               <IconButton size="small" onClick={() => {/* stub */}}>
@@ -409,20 +424,18 @@ export default function DiscussionsFlyout({
           </Stack>
         )}
 
-        {/* List — stays mounted across views so each row keeps its expand /
-            messages / play state; just hidden while the form is open. */}
         <Box sx={{ display: view === "form" ? "none" : "block" }}>
           {loadingList ? (
             <Box sx={{ display: "flex", justifyContent: "center", mt: 6 }}>
               <CircularProgress />
             </Box>
-          ) : visible.length === 0 ? (
+          ) : shownDiscussions.length === 0 ? (
             <Box sx={{ textAlign: "center", mt: 6, color: "text.secondary" }}>
               <Typography variant="body2">No discussions yet. Tap + to start one.</Typography>
             </Box>
           ) : (
             <Stack spacing={2}>
-              {visible.map((d) => (
+              {shownDiscussions.map((d) => (
                 <Discussion
                   key={d.id}
                   discussion={d}
@@ -437,6 +450,30 @@ export default function DiscussionsFlyout({
           )}
         </Box>
       </Box>
+
+      {/* ─── Sort menu ────────────────────────────────────────────────── */}
+      <Menu anchorEl={sortAnchor} open={sortAnchor !== null} onClose={() => setSortAnchor(null)}>
+        {SORT_OPTIONS.map((o) => (
+          <MenuItem
+            key={o.key}
+            onClick={() => {
+              setSortBy(o.key);
+              setSortAnchor(null);
+            }}
+          >
+            <ListItemIcon>
+              <Radio
+                edge="start"
+                size="small"
+                checked={sortBy === o.key}
+                tabIndex={-1}
+                disableRipple
+              />
+            </ListItemIcon>
+            <ListItemText>{o.label}</ListItemText>
+          </MenuItem>
+        ))}
+      </Menu>
 
       {/* ─── Shared row-actions menu ──────────────────────────────────── */}
       <Menu anchorEl={menu?.anchorEl ?? null} open={menu !== null} onClose={closeMenu}>
