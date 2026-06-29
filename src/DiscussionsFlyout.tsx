@@ -144,11 +144,17 @@ export default function DiscussionsFlyout({
     new Set(discussions.map((d) => d.category).filter(Boolean)),
   );
 
-  const loadList = useCallback(() => {
+  const loadList = useCallback((idToExpand?: number) => {
     if (!token || !passageId || !step) return;
     setLoadingList(true);
     getDiscussions(token, passageId, step)
-      .then(setDiscussions)
+      .then((list) =>
+        setDiscussions(
+          idToExpand == null
+            ? list
+            : list.map((d) => (d.id === idToExpand ? { ...d, expanded: true } : d)),
+        ),
+      )
       .catch(() => {})
       .finally(() => setLoadingList(false));
   }, [token, passageId, step]);
@@ -212,16 +218,16 @@ export default function DiscussionsFlyout({
     };
     try {
       if (editingId !== null) {
-        const d = discussions.find((x) => x.id === editingId);
+        const d = discussions.find((x) => x.id === editingId)!;
         const { discussion } = await updateDiscussion(token, editingId, {
           ...fields,
-          resolved: d?.resolved ?? false,
+          resolved: d.resolved
         });
-        replaceDiscussion(discussion);
+        updateDiscussionState(discussion);
       } else {
         const content: MessageContent = audio ? { audio } : { text: text.trim() };
-        await createDiscussion(token, passageId, step, fields, content);
-        loadList();
+        const { discussion } = await createDiscussion(token, passageId, step, fields, content);
+        loadList(discussion.id);
       }
       setView("list");
     } catch {
@@ -244,7 +250,7 @@ export default function DiscussionsFlyout({
         assigneeId: d.assigneeEmail !== null ? getUserId(d.assigneeEmail) : null,
         resolved: true,
       });
-      replaceDiscussion(discussion);
+      updateDiscussionState(discussion);
     } catch {
       /* ignore */
     }
@@ -265,7 +271,7 @@ export default function DiscussionsFlyout({
   const markRead = (id: number) =>
     setDiscussions((prev) => prev.map((x) => (x.id === id ? { ...x, unread: false } : x)));
 
-  const replaceDiscussion = (discussion: Discussion) =>
+  const updateDiscussionState = (discussion: Discussion) =>
     setDiscussions((prev) => prev.map((x) => (x.id === discussion.id ? discussion : x)));
 
   // ─── Render ───────────────────────────────────────────────────────────────
@@ -316,16 +322,16 @@ export default function DiscussionsFlyout({
           </Typography>
           {view === "list" && (
             <>
-              <IconButton size="small" aria-label="sort" onClick={() => {/* stub */}}>
+              <IconButton size="small" onClick={() => {/* stub */}}>
                 <SortIcon />
               </IconButton>
-              <IconButton size="small" aria-label="filter" onClick={() => {/* stub */}}>
+              <IconButton size="small" onClick={() => {/* stub */}}>
                 <FilterListIcon />
               </IconButton>
-              <IconButton size="small" aria-label="add discussion" onClick={() => openCreate()}>
+              <IconButton size="small" onClick={() => openCreate()}>
                 <AddIcon />
               </IconButton>
-              <IconButton size="small" aria-label="close" onClick={onClose}>
+              <IconButton size="small" onClick={onClose}>
                 <CloseIcon />
               </IconButton>
             </>
@@ -471,6 +477,10 @@ function Discussion({
   const [loading, setLoading] = useState(false);
   const [replyText, setReplyText] = useState("");
   const [replyAudio, setReplyAudio] = useState<Blob | null>(null);
+
+  useEffect(() => {
+    if (discussion.expanded) toggle();
+  }, []);
 
   // If the topic is a time range, clip the passage to it in the background.
   const range = useMemo(() => parseTimeRange(discussion.topic), [discussion.topic]);

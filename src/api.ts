@@ -935,6 +935,7 @@ export interface Discussion {
   createdAt: string;
   messageCount: number;
   lastActivity: string | null;
+  expanded?: boolean;
 }
 
 export interface DiscussionMessage {
