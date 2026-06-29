@@ -102,7 +102,7 @@ const theme = createTheme({
         {
           props: { variant: "primary" },
           style: {
-            background: "#333",
+            background: "black",
             color: "#fff",
             "&:hover": {
               background: "#555",
@@ -168,7 +168,7 @@ const theme = createTheme({
     MuiSlider: {
       styleOverrides: {
         root: ({ theme }) => ({
-          color: theme.palette.grey[700],
+          color: theme.palette.grey[800],
           paddingBlock: "10px !important", //overrides padding changes between mobile and desktop
         }),
       },
@@ -176,7 +176,7 @@ const theme = createTheme({
     MuiIconButton: {
       styleOverrides: {
         root: ({ theme }) => ({
-          color: theme.palette.grey[700],
+          color: theme.palette.grey[800],
         }),
       },
       variants: [
@@ -190,7 +190,7 @@ const theme = createTheme({
             backgroundColor: "#ffffff",
             borderRadius: "8px",
             boxShadow: "0px 4px 12px rgba(0, 0, 0, 0.15)",
-            color: theme.palette.grey[700],
+            color: theme.palette.grey[800],
             transition: "all 0.2s ease-in-out",
             "&:hover": {
               backgroundColor: "#f5f5f5",
@@ -201,7 +201,7 @@ const theme = createTheme({
         {
           props: { variant: "primary" },
           style: {
-            background: "#333",
+            background: "black",
             color: "#fff",
             "&:hover": {
               background: "#555",

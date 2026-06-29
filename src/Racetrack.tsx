@@ -99,10 +99,10 @@ export default function Racetrack() {
           {STEPS.map((step) => {
             const isViewed = step.id === viewedStepId;
             const color = isViewed
-              ? "#111"
+              ? "black"
               : currentStep != null && step.id < currentStep
-                ? "#888"
-                : "#ccc";
+                ? "grey.600"
+                : "grey.400";
             return (
               <Box
                 key={step.id}

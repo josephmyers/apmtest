@@ -111,7 +111,7 @@ export default function RadialAudioPlayer({
             thickness={2}
             size={size}
             sx={{
-              color: (theme) => theme.palette.grey[700],
+              color: (theme) => theme.palette.grey[800],
               position: "absolute",
               top: 0,
               left: 0,

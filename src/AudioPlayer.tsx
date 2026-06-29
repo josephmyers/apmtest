@@ -889,7 +889,7 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
               aria-label={playing ? "pause" : "play"}
             >
               {playing ? (
-                <PauseIcon fontSize="large" sx={{ color: "neutral.main" }} />
+                <PauseIcon fontSize="large" />
               ) : (
                 <PlayArrowIcon fontSize="large" />
               )}
