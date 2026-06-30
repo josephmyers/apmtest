@@ -926,6 +926,9 @@ export interface MessageAudioLink {
 /** Thread metadata for the list view; messages are fetched separately. */
 export interface Discussion {
   id: number;
+  passageId: number;
+  step: number;
+  passageReference: string;
   topic: string;
   category: string;
   assigneeEmail: string | null;
@@ -976,11 +979,18 @@ export async function getDiscussions(
   token: string,
   passageId: number,
   step: number,
+  opts: { allSteps?: boolean; projectId?: number } = {},
 ): Promise<Discussion[]> {
-  const res = await fetch(
-    `${API_BASE}/discussions?passageId=${passageId}&step=${step}`,
-    { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" },
-  );
+  const params = new URLSearchParams({
+    passageId: String(passageId),
+    step: String(step),
+  });
+  if (opts.allSteps) params.set("allSteps", "1");
+  if (opts.projectId) params.set("projectId", String(opts.projectId));
+  const res = await fetch(`${API_BASE}/discussions?${params}`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
+  });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "Failed to fetch discussions");
   return data.discussions as Discussion[];

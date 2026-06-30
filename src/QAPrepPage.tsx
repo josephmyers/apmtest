@@ -498,7 +498,7 @@ function QAPrepPageInner() {
             variant="floating"
             onClick={() => setDiscussionsOpen(true)}
           >
-            <Badge color="info" variant="dot" invisible={!discussionsUnread}>
+            <Badge variant="dot" invisible={!discussionsUnread}>
               <ForumIcon />
             </Badge>
           </IconButton>
@@ -512,6 +512,7 @@ function QAPrepPageInner() {
         onClose={() => setDiscussionsOpen(false)}
         passageId={passage?.id ?? 0}
         step={stepForRoute(location.pathname)?.id!}
+        projectId={projectId}
         passageAudio={passageAudio?.blob}
         onUnreadChange={setDiscussionsUnread}
       />

@@ -134,6 +134,13 @@ const theme = createTheme({
         },
       },
     },
+    MuiBadge: {
+      styleOverrides: {
+        badge: {
+          backgroundColor: PRIMARY_MAIN
+        }
+      }
+    },
     MuiAccordion: {
       styleOverrides: {
         root: {

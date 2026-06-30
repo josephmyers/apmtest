@@ -5,6 +5,7 @@ import {
   jsonRes,
   getUser,
   assertPassageAccess,
+  assertProjectAccess,
   HttpError,
 } from "./_auth.js";
 import { parseLinks, readMessageContent, createMessage } from "./_discussions.js";
@@ -15,6 +16,9 @@ type Row = Record<string, unknown>;
 function mapDiscussion(r: Row) {
   return {
     id: r.id as number,
+    passageId: r.passage_id as number,
+    step: r.step as number,
+    passageReference: r.passage_reference as string,
     topic: r.topic as string,
     category: r.category as string,
     assigneeId: (r.assignee_id as number | null) ?? null,
@@ -31,16 +35,18 @@ function mapDiscussion(r: Row) {
 // Assembled thread row (metadata + per-caller read flag + activity aggregates).
 async function fetchDiscussionById(sql: Sql, userId: number, id: number) {
   const rows = await sql`
-    SELECT d.id, d.topic, d.category, d.assignee_id, d.resolved, d.created_by, d.created_at,
+    SELECT d.id, d.passage_id, d.step, d.topic, d.category, d.assignee_id, d.resolved,
+           d.created_by, d.created_at, pa.reference AS passage_reference,
            au.email AS assignee_email,
            COUNT(m.id) AS message_count,
            MAX(m.created_at) AS last_activity,
            ${userId} = ANY(d.read_by) AS is_read
     FROM discussions d
+    JOIN passages pa ON d.passage_id = pa.id
     LEFT JOIN discussion_messages m ON m.discussion_id = d.id
     LEFT JOIN users au ON d.assignee_id = au.id
     WHERE d.id = ${id}
-    GROUP BY d.id, au.email
+    GROUP BY d.id, au.email, pa.reference
   `;
   return rows.length ? mapDiscussion(rows[0]) : null;
 }
@@ -67,24 +73,36 @@ export default handle(async (req: Request) => {
   const method = req.method;
   const store = getStore("audio");
 
-  // GET /discussions?passageId=N&step=N — list threads, oldest first (newest last).
+  // GET /discussions?passageId=N&step=N[&allSteps=1][&projectId=N]
+  // List threads, oldest first. allSteps drops the step filter; a projectId widens
+  // the scope from the single passage to every passage in that project.
   if (method === "GET") {
     const passageId = Number(url.searchParams.get("passageId"));
     const step = Number(url.searchParams.get("step"));
     if (!passageId || !step) throw new HttpError(400, "passageId and step are required");
     await assertPassageAccess(sql, user.userId, passageId);
 
+    const allSteps = url.searchParams.get("allSteps") === "1";
+    const projectId = Number(url.searchParams.get("projectId")) || 0;
+    const allPassages = projectId > 0;
+    if (allPassages) await assertProjectAccess(sql, user.userId, projectId);
+
     const rows = await sql`
-      SELECT d.id, d.topic, d.category, d.assignee_id, d.resolved, d.created_by, d.created_at,
+      SELECT d.id, d.passage_id, d.step, d.topic, d.category, d.assignee_id, d.resolved,
+             d.created_by, d.created_at, pa.reference AS passage_reference,
              au.email AS assignee_email,
              COUNT(m.id) AS message_count,
              MAX(m.created_at) AS last_activity,
              ${user.userId} = ANY(d.read_by) AS is_read
       FROM discussions d
+      JOIN passages pa ON d.passage_id = pa.id
+      JOIN sections s ON pa.section_id = s.id
       LEFT JOIN discussion_messages m ON m.discussion_id = d.id
       LEFT JOIN users au ON d.assignee_id = au.id
-      WHERE d.passage_id = ${passageId} AND d.step = ${step}
-      GROUP BY d.id, au.email
+      WHERE ((${allPassages} AND s.project_id = ${projectId})
+          OR (NOT ${allPassages} AND d.passage_id = ${passageId}))
+        AND (${allSteps} OR d.step = ${step})
+      GROUP BY d.id, au.email, pa.reference
       ORDER BY d.created_at, d.id
     `;
     return jsonRes({ discussions: rows.map(mapDiscussion) });

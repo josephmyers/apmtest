@@ -1,11 +1,19 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Autocomplete,
+  Badge,
   Box,
   Button,
+  Checkbox,
   CircularProgress,
   Collapse,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Drawer,
+  FormControlLabel,
+  FormGroup,
   IconButton,
   ListItemIcon,
   ListItemText,
@@ -30,6 +38,7 @@ import { useAuth } from "./AuthContext";
 import {
   getTeamMembers,
   getDiscussions,
+  fetchAudio,
   createDiscussion,
   updateDiscussion,
   deleteDiscussion,
@@ -50,12 +59,14 @@ import { clipAudio } from "./audioUtils";
 import { formatTime } from "./formatTime";
 import DiscussionComposer from "./DiscussionComposer";
 import EmailAvatar from "./EmailAvatar";
+import { getStepById } from "./steps";
 
 interface DiscussionsFlyoutProps {
   open: boolean | { start: number; end: number };
   onClose: () => void;
   passageId: number;
   step: number;
+  projectId?: number;
   passageAudio?: Blob;
   onUnreadChange?: (hasUnread: boolean) => void;
 }
@@ -94,6 +105,16 @@ const parseTimeRange = (topic: string): { start: number; end: number } | null =>
   return { start, end };
 };
 
+// Deterministic swatch color for a passage+step: every discussion from the same
+// passage+step shares one color. Hue is hashed from the key; fixed saturation +
+// lightness keep the colors harmonious (never garish) however many appear.
+const passageStepColor = (passageId: number, step: number): string => {
+  const key = `${passageId}:${step}`;
+  let hash = 0;
+  for (let i = 0; i < key.length; i++) hash = (hash * 31 + key.charCodeAt(i)) | 0;
+  return `hsl(${Math.abs(hash) % 360}, 60%, 50%)`;
+};
+
 // A message's timestamp: clock time for today (e.g. "10:55 AM"), otherwise the
 // date too (e.g. "Jun 17, 10:55 AM", or with the year when it isn't this one).
 const formatMessageTime = (iso: string): string => {
@@ -121,6 +142,7 @@ export default function DiscussionsFlyout({
   onClose,
   passageId,
   step,
+  projectId,
   passageAudio,
   onUnreadChange,
 }: DiscussionsFlyoutProps) {
@@ -136,6 +158,14 @@ export default function DiscussionsFlyout({
   const [sortBy, setSortBy] = useState<SortKey>("oldest");
   const [sortAnchor, setSortAnchor] = useState<HTMLElement | null>(null);
 
+  // Filters
+  const [filterAnchor, setFilterAnchor] = useState<HTMLElement | null>(null);
+  const [showResolved, setShowResolved] = useState(false);
+  const [allSteps, setAllSteps] = useState(false);
+  const [allPassages, setAllPassages] = useState(false);
+  const [categoryFilter, setCategoryFilter] = useState<Set<string>>(new Set()); // "" = Uncategorized; empty = All
+  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
+
   // New/edit thread form. `editingId` null = creating a new thread.
   const [editingId, setEditingId] = useState<number | null>(null);
   const [topic, setTopic] = useState("");
@@ -145,7 +175,8 @@ export default function DiscussionsFlyout({
   const [audio, setAudio] = useState<Blob | null>(null);
 
   const shownDiscussions = discussions
-    .filter((d) => !d.resolved)
+    .filter((d) => d.resolved === showResolved)
+    .filter((d) => categoryFilter.size === 0 || categoryFilter.has(d.category))
     .sort((a, b) => {
       switch (sortBy) {
         case "topic":    return a.topic.localeCompare(b.topic) || a.id - b.id;
@@ -155,14 +186,39 @@ export default function DiscussionsFlyout({
       }
     });
 
-  const categoryOptions = Array.from(
-    new Set(discussions.map((d) => d.category).filter(Boolean)),
+  const categoryOptions = [
+    "",
+    ...Array.from(new Set(discussions.map((d) => d.category).filter(Boolean))),
+  ];
+
+  const filtersActive =
+    showResolved || allSteps || allPassages || categoryFilter.size > 0;
+
+  // Resolve a passage's audio for clip previews: the current passage reuses the
+  // already-loaded blob; other passages (shown via All Passages/Steps) are
+  // fetched once and cached.
+  const audioCache = useRef<Map<number, Promise<Blob | null>>>(new Map());
+  const getPassageAudio = useCallback(
+    (pid: number): Promise<Blob | null> => {
+      if (pid === passageId) return Promise.resolve(passageAudio ?? null);
+      const cache = audioCache.current;
+      let pending = cache.get(pid);
+      if (!pending) {
+        pending = token ? fetchAudio(token, pid) : Promise.resolve(null);
+        cache.set(pid, pending);
+      }
+      return pending;
+    },
+    [passageId, passageAudio, token],
   );
 
   const loadList = useCallback((idToExpand?: number) => {
     if (!token || !passageId || !step) return;
     setLoadingList(true);
-    getDiscussions(token, passageId, step)
+    getDiscussions(token, passageId, step, {
+      allSteps,
+      projectId: allPassages ? projectId : undefined,
+    })
       .then((list) =>
         setDiscussions(
           idToExpand == null
@@ -172,7 +228,7 @@ export default function DiscussionsFlyout({
       )
       .catch(() => {})
       .finally(() => setLoadingList(false));
-  }, [token, passageId, step]);
+  }, [token, passageId, step, allSteps, allPassages, projectId]);
 
   useEffect(() => {
     loadList();
@@ -185,7 +241,11 @@ export default function DiscussionsFlyout({
   }, [open]);
 
   useEffect(() => {
-    onUnreadChange?.(shownDiscussions.some((d) => d.unread));
+    onUnreadChange?.(
+      discussions.some(
+        (d) => d.passageId === passageId && d.step === step && !d.resolved && d.unread,
+      ),
+    );
   }, [discussions]);
 
   useEffect(() => {
@@ -254,7 +314,7 @@ export default function DiscussionsFlyout({
 
   const closeMenu = () => setMenu(null);
 
-  const handleResolve = async () => {
+  const handleToggleResolved = async () => {
     if (!token || !menu) return;
     const d = menu.discussion;
     closeMenu();
@@ -263,7 +323,7 @@ export default function DiscussionsFlyout({
         topic: d.topic,
         category: d.category,
         assigneeId: d.assigneeEmail !== null ? getUserId(d.assigneeEmail) : null,
-        resolved: true,
+        resolved: !d.resolved,
       });
       updateDiscussionState(discussion);
     } catch {
@@ -340,8 +400,10 @@ export default function DiscussionsFlyout({
               <IconButton size="small" onClick={(e) => setSortAnchor(e.currentTarget)}>
                 <SortIcon />
               </IconButton>
-              <IconButton size="small" onClick={() => {/* stub */}}>
-                <FilterListIcon />
+              <IconButton size="small" onClick={(e) => setFilterAnchor(e.currentTarget)}>
+                <Badge variant="dot" invisible={!filtersActive}>
+                  <FilterListIcon />
+                </Badge>
               </IconButton>
               <IconButton size="small" onClick={() => openCreate()}>
                 <AddIcon />
@@ -400,7 +462,7 @@ export default function DiscussionsFlyout({
             <Autocomplete
               freeSolo
               size="small"
-              options={categoryOptions}
+              options={categoryOptions.filter(Boolean)}
               value={category}
               onChange={(_e, v) => setCategory(v ?? "")}
               onInputChange={(_e, v) => setCategory(v)}
@@ -441,7 +503,9 @@ export default function DiscussionsFlyout({
                   discussion={d}
                   token={token}
                   currentUserId={user?.id ?? null}
-                  passageAudio={passageAudio}
+                  currentPassageId={passageId}
+                  currentStep={step}
+                  getPassageAudio={getPassageAudio}
                   onMenu={(anchorEl, discussion) => setMenu({ anchorEl, discussion })}
                   onRead={markRead}
                 />
@@ -485,10 +549,144 @@ export default function DiscussionsFlyout({
         >
           Edit
         </MenuItem>
-        <MenuItem onClick={handleResolve}>Resolve</MenuItem>
+        <MenuItem onClick={handleToggleResolved}>
+          {menu?.discussion.resolved ? "Reopen" : "Resolve"}
+        </MenuItem>
         <MenuItem onClick={handleDelete}>Delete</MenuItem>
       </Menu>
+
+      {/* ─── Filter menu ──────────────────────────────────────────────── */}
+      <Menu anchorEl={filterAnchor} open={filterAnchor !== null} onClose={() => setFilterAnchor(null)}>
+        <FilterCheckItem
+          label="Resolved"
+          checked={showResolved}
+          onToggle={() => setShowResolved((v) => !v)}
+        />
+        <FilterCheckItem
+          label="All Steps"
+          checked={allSteps}
+          onToggle={() => setAllSteps((v) => !v)}
+        />
+        <FilterCheckItem
+          label="All Passages"
+          checked={allPassages}
+          disabled={!projectId}
+          onToggle={() => setAllPassages((v) => !v)}
+        />
+        {/* Category menu option */}
+        <MenuItem onClick={() => { setFilterAnchor(null); setCategoryDialogOpen(true); }}>
+          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", gap: 2 }}>
+            <Typography sx={{ flexShrink: 0 }}>Category</Typography>
+            <Box sx={{ flex: "1 1 0", maxWidth: "80px", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "end", mr: "6px" }}>
+              {categoryFilter.size > 1 ? (
+                <Box
+                  sx={{
+                    width: 20,
+                    height: 20,
+                    borderRadius: "50%",
+                    bgcolor: "neutral.main",
+                    color: "white",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    flexShrink: 0,
+                  }}
+                >
+                  {categoryFilter.size}
+                </Box>
+              ) : (
+                <Typography variant="body2" color="text.secondary" noWrap sx={{mt: "2px"}}>
+                  {categoryFilter.size === 0 ? "All" : ([...categoryFilter][0] || "Uncategorized")}
+                </Typography>
+              )}
+            </Box>
+          </Box>
+        </MenuItem>
+      </Menu>
+
+      {categoryDialogOpen && (
+        <CategoryFilterDialog
+          options={categoryOptions}
+          selected={categoryFilter}
+          onCancel={() => setCategoryDialogOpen(false)}
+          onSave={(next) => {
+            setCategoryFilter(next);
+            setCategoryDialogOpen(false);
+          }}
+        />
+      )}
     </Drawer>
+  );
+}
+
+function FilterCheckItem({
+  label,
+  checked,
+  onToggle,
+  disabled,
+}: {
+  label: string;
+  checked: boolean;
+  onToggle: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <MenuItem disabled={disabled} onClick={onToggle}>
+      <ListItemText>{label}</ListItemText>
+      <ListItemIcon>
+        <Checkbox edge="end" size="small" checked={checked} tabIndex={-1} disableRipple />
+      </ListItemIcon>
+    </MenuItem>
+  );
+}
+
+function CategoryFilterDialog({
+  options,
+  selected,
+  onSave,
+  onCancel,
+}: {
+  options: string[];
+  selected: Set<string>;
+  onSave: (next: Set<string>) => void;
+  onCancel: () => void;
+}) {
+  const [selectedOptions, setSelectedOptions] = useState<Set<string>>(() => new Set(selected));
+
+  const toggle = (value: string) =>
+    setSelectedOptions((prev) => {
+      const next = new Set(prev);
+      if (next.has(value)) next.delete(value);
+      else next.add(value);
+      return next;
+    });
+
+  const handleSave = () =>
+    onSave(new Set([...selectedOptions].filter((v) => options.includes(v))));
+
+  return (
+    <Dialog open onClose={onCancel} fullWidth>
+      <DialogTitle>Filter by Category</DialogTitle>
+      <DialogContent>
+        <FormGroup>
+          {options.map((value) => (
+            <FormControlLabel
+              key={value || "__uncategorized__"}
+              control={<Checkbox checked={selectedOptions.has(value)} onChange={() => toggle(value)} />}
+              label={value || "Uncategorized"}
+            />
+          ))}
+        </FormGroup>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onCancel}>Cancel</Button>
+        <Button variant="primary" onClick={handleSave}>
+          Save
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 }
 
@@ -498,14 +696,18 @@ function Discussion({
   discussion,
   token,
   currentUserId,
-  passageAudio,
+  currentPassageId,
+  currentStep,
+  getPassageAudio,
   onMenu,
   onRead,
 }: {
   discussion: Discussion;
   token: string | null;
   currentUserId: number | null;
-  passageAudio?: Blob;
+  currentPassageId: number;
+  currentStep: number;
+  getPassageAudio: (passageId: number) => Promise<Blob | null>;
   onMenu: (anchorEl: HTMLElement, d: Discussion) => void;
   onRead: (id: number) => void;
 }) {
@@ -523,16 +725,17 @@ function Discussion({
   const range = useMemo(() => parseTimeRange(discussion.topic), [discussion.topic]);
   const [clip, setClip] = useState<Blob | null>(null);
   useEffect(() => {
-    if (!range || !passageAudio) {
+    if (!range) {
       setClip(null);
       return;
     }
     let cancelled = false;
-    clipAudio(passageAudio, range.start, range.end)
-      .then((b) => { if (!cancelled) setClip(b.size > 0 ? b : null); })
+    getPassageAudio(discussion.passageId)
+      .then((blob) => (blob ? clipAudio(blob, range.start, range.end) : null))
+      .then((b) => { if (!cancelled) setClip(b && b.size > 0 ? b : null); })
       .catch(() => { if (!cancelled) setClip(null); });
     return () => { cancelled = true; };
-  }, [range, passageAudio]);
+  }, [range, discussion.passageId, getPassageAudio]);
 
   const toggle = () => {
     const next = !expanded;
@@ -580,15 +783,13 @@ function Discussion({
 
   return (
     <Paper sx={{ borderRadius: 2 }}>
-      <Stack
-        direction="row"
-        alignItems="center"
-        spacing={1}
+      <Box
         onClick={toggle}
-        sx={{cursor: "pointer", px: 1.5, py: 1, bgcolor: "neutral.light" }}
+        sx={{ cursor: "pointer", px: 1.5, py: 1, bgcolor: "neutral.light" }}
       >
+      <Stack direction="row" alignItems="center" spacing={1}>
         {discussion.unread && (
-          <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "info.main", flexShrink: 0 }} />
+          <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "primary.main", flexShrink: 0 }} />
         )}
         {clip && (
           <Box
@@ -627,6 +828,24 @@ function Discussion({
           <MoreVertIcon fontSize="small" />
         </IconButton>
       </Stack>
+
+        {(discussion.passageId !== currentPassageId || discussion.step !== currentStep) && (
+          <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mt: 0.5 }}>
+            <Box
+              sx={{
+                width: 11,
+                height: 11,
+                borderRadius: "2px",
+                bgcolor: passageStepColor(discussion.passageId, discussion.step),
+                flexShrink: 0,
+              }}
+            />
+            <Typography variant="caption" color="text.secondary" noWrap>
+              {discussion.passageReference} · {getStepById(discussion.step)?.title}
+            </Typography>
+          </Stack>
+        )}
+      </Box>
 
       <Collapse in={expanded}>
         <Box sx={{m: 1.5}}>

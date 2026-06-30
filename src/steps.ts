@@ -48,7 +48,7 @@ export function prevStep(id: number): StepDef | null {
   return getStepById(id - 1) ?? null;
 }
 
-function getStepById(id: number): StepDef | undefined {
+export function getStepById(id: number): StepDef | undefined {
   return STEPS.find((s) => s.id === id);
 }
 
