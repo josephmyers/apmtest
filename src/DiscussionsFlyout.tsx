@@ -584,7 +584,7 @@ export default function DiscussionsFlyout({
                     width: 20,
                     height: 20,
                     borderRadius: "50%",
-                    bgcolor: "neutral.main",
+                    bgcolor: "neutral.black",
                     color: "white",
                     display: "flex",
                     alignItems: "center",
@@ -781,69 +781,112 @@ function Discussion({
     }
   };
 
+  const showLocation =
+    discussion.passageId !== currentPassageId || discussion.step !== currentStep;
+  const hasCategory = !!discussion.category;
+  const showSecondLine = showLocation || hasCategory;
+
   return (
     <Paper sx={{ borderRadius: 2 }}>
       <Box
         onClick={toggle}
-        sx={{ cursor: "pointer", px: 1.5, py: 1, bgcolor: "neutral.light" }}
+        sx={{
+          position: "relative",
+          cursor: "pointer",
+          px: 1.5,
+          py: 1,
+          bgcolor: "neutral.light",
+        }}
       >
-      <Stack direction="row" alignItems="center" spacing={1}>
-        {discussion.unread && (
-          <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "primary.main", flexShrink: 0 }} />
-        )}
-        {clip && (
-          <Box
-            sx={{ display: "flex", justifyContent: "center" }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <RadialAudioPlayer audio={clip} size={24} />
-          </Box>
-        )}
-        <Typography
-          variant="subtitle2"
-          sx={{ fontWeight: discussion.unread ? 700 : 500 }}
-          noWrap
-        >
-          {discussion.topic}
-        </Typography>
-        <ExpandMoreIcon
-          fontSize="small"
-          sx={{
-            color: "text.secondary",
-            transition: "transform 0.2s",
-            transform: expanded ? "rotate(180deg)" : "none",
-            marginRight: "auto !important"
-          }}
-        />
-        
-        {discussion.assigneeEmail && <EmailAvatar email={discussion.assigneeEmail} />}
-        <IconButton
-          size="small"
-          aria-label="discussion actions"
-          onClick={(e) => {
-            e.stopPropagation();
-            onMenu(e.currentTarget, discussion);
-          }}
-        >
-          <MoreVertIcon fontSize="small" />
-        </IconButton>
-      </Stack>
-
-        {(discussion.passageId !== currentPassageId || discussion.step !== currentStep) && (
-          <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mt: 0.5 }}>
+        <Stack direction="row" alignItems="center" spacing={1}>
+          {discussion.unread && (
+            <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "primary.main", flexShrink: 0 }} />
+          )}
+          {clip && (
             <Box
-              sx={{
-                width: 11,
-                height: 11,
-                borderRadius: "2px",
-                bgcolor: passageStepColor(discussion.passageId, discussion.step),
-                flexShrink: 0,
-              }}
-            />
-            <Typography variant="caption" color="text.secondary" noWrap>
-              {discussion.passageReference} · {getStepById(discussion.step)?.title}
+              sx={{ display: "flex", justifyContent: "center" }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <RadialAudioPlayer audio={clip} size={24} />
+            </Box>
+          )}
+          <Typography
+            variant="subtitle2"
+            sx={{ fontWeight: discussion.unread ? 700 : 500 }}
+            noWrap
+          >
+            {discussion.topic}
+          </Typography>
+          <ExpandMoreIcon
+            fontSize="small"
+            sx={{
+              color: "text.secondary",
+              transition: "transform 0.2s",
+              transform: expanded ? "rotate(180deg)" : "none",
+              marginRight: "auto !important"
+            }}
+          />
+          
+          {discussion.assigneeEmail && <EmailAvatar email={discussion.assigneeEmail} />}
+          <IconButton
+            size="small"
+            aria-label="discussion actions"
+            onClick={(e) => {
+              e.stopPropagation();
+              onMenu(e.currentTarget, discussion);
+            }}
+          >
+            <MoreVertIcon fontSize="small" />
+          </IconButton>
+        </Stack>
+
+        {showSecondLine &&
+          (showLocation ? (
+            <Stack
+              direction="row"
+              alignItems="center"
+              spacing={0.75}
+              sx={{ my: 0.75 }}
+            >
+              <Box
+                sx={{
+                  width: 11,
+                  height: 11,
+                  borderRadius: "2px",
+                  bgcolor: passageStepColor(discussion.passageId, discussion.step),
+                  flexShrink: 0,
+                }}
+              />
+              <Typography variant="caption" color="text.secondary" noWrap>
+                {discussion.passageReference} · {getStepById(discussion.step)?.title}
+              </Typography>
+            </Stack>
+          ) : (
+            // Category but no location line: reserve one caption line of height so a
+            // header is only ever one or two lines tall.
+            <Typography variant="caption" noWrap sx={{ mt: 0.5, display: "block" }}>
+              &nbsp;
             </Typography>
-          </Stack>
+          ))}
+
+        {hasCategory && (
+          <Box
+            sx={{
+              position: "absolute",
+              bottom: 0,
+              right: 6,
+              maxWidth: "150px",
+              bgcolor: "neutral.lightGrey",
+              px: 1,
+              pt: 0.25,
+              borderTopLeftRadius: 12,
+              borderTopRightRadius: 12
+            }}
+          >
+            <Typography variant="caption" noWrap sx={{ display: "block" }}>
+              {discussion.category}
+            </Typography>
+          </Box>
         )}
       </Box>
 

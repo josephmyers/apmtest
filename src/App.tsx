@@ -43,6 +43,23 @@ declare module "@mui/material/IconButton" {
   }
 }
 
+declare module "@mui/material/styles" {
+  interface Palette {
+    alert: {
+      main: string;
+    };
+    neutral: {
+      black: string;
+      lightGrey: string;
+      light: string;
+    };
+  }
+  interface PaletteOptions {
+    alert: {}
+    neutral: {}
+  }
+}
+
 const theme = createTheme({
   breakpoints: {
     values: BREAKPOINTS,
@@ -60,10 +77,11 @@ const theme = createTheme({
       light: alpha("#9fc5e8", 0.13)
     },
     neutral: {
-      main: "#000000",
+      black: "#000000",
+      lightGrey: "#ddd",
       light: "#f8f8f8"
     },
-  } as any,
+  },
   typography: {
     button: {
       textTransform: "none",
@@ -171,6 +189,14 @@ const theme = createTheme({
           },
         },
       },
+    },
+    MuiAvatar: {
+      styleOverrides: {
+        root: ({theme}) => ({
+          color: theme.palette.neutral.black,
+          backgroundColor: theme.palette.neutral.lightGrey
+        })
+      }
     },
     MuiSlider: {
       styleOverrides: {

@@ -16,7 +16,7 @@ export default function EmailAvatar({ email, size = 24, sx }: EmailAvatarProps) 
   return (
     <Avatar
       sx={[
-        { width: size, height: size, fontSize: size * 0.45 },
+        { width: size, height: size, fontSize: size * 0.5 },
         ...(Array.isArray(sx) ? sx : [sx]),
       ]}
     >
