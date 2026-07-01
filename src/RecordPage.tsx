@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   Backdrop,
+  Badge,
   Box,
   Button,
   CircularProgress,
@@ -9,6 +10,7 @@ import {
   ListItemIcon,
   ListItemText,
   MenuItem,
+  Stack,
   Typography,
 } from "@mui/material";
 import { useSnackbar } from "./useSnackbar";
@@ -19,7 +21,8 @@ import InsertDriveFileOutlinedIcon from "@mui/icons-material/InsertDriveFileOutl
 
 import StopIcon from "@mui/icons-material/Stop";
 import PauseIcon from "@mui/icons-material/Pause";
-import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
+import ForumIcon from "@mui/icons-material/Forum";
+import AddIcon from "@mui/icons-material/Add";
 
 import { useAuth } from "./AuthContext";
 import {
@@ -40,8 +43,9 @@ import { AudioPlayer, type AudioPlayerHandle } from "./AudioPlayer";
 import PageHeader from "./PageHeader";
 import StepFooter from "./StepFooter";
 import { PassageProvider, usePassage } from "./PassageContext";
-import { type StepNavState } from "./steps";
+import { stepForRoute, type StepNavState } from "./steps";
 import VersionsDialog, { type UseVersionResult } from "./VersionsDialog";
+import DiscussionsFlyout from "./DiscussionsFlyout";
 
 /**
  * Outer wrapper: keys PassageProvider on passageId so its state
@@ -62,7 +66,8 @@ function RecordPageInner() {
   const { token } = useAuth();
   const { passage } = usePassage();
 
-  const nav = useLocation().state as StepNavState;
+  const location = useLocation();
+  const nav = location.state as StepNavState;
   const passageId = nav?.passageId ?? 0;
   const passageReference = nav?.passageReference ?? "Unknown Passage";
   const projectName = nav?.projectName ?? "";
@@ -81,6 +86,8 @@ function RecordPageInner() {
   const [uploading, setUploading] = useState(false);
   const { setSnackMsg, snackbarElement } = useSnackbar();
   const [selection, setSelection] = useState<{ start: number; end: number } | null>(null);
+  const [discussionsOpen, setDiscussionsOpen] = useState<boolean | { start: number; end: number }>(false);
+  const [discussionsUnread, setDiscussionsUnread] = useState(false);
 
   const [audioInitialized, setAudioInitialized] = useState(false);
   const [hasUnversionedReplacements, setHasUnversionedReplacements] = useState(false);
@@ -488,16 +495,30 @@ function RecordPageInner() {
           ))}
         </Box>
 
-        {/* Floating Discussions button */}
-        <IconButton
-          variant="floating"
-          sx={{ position: "absolute", bottom: 16, right: 16 }}
-          onClick={() => {
-            /* stub */
-          }}
-        >
-          <ChatBubbleOutlineIcon />
-        </IconButton>
+        <Stack spacing={1} sx={{ position: "absolute", bottom: 16, right: 16 }}>
+          {selection && (
+            <IconButton
+              variant="floating"
+              onClick={() => setDiscussionsOpen(selection)}
+            >
+              <Badge
+                overlap="circular"
+                anchorOrigin={{ vertical: "top", horizontal: "right" }}
+                badgeContent={<AddIcon sx={{ fontSize: 20, ml: 1, mb: 1 }} />}
+              >
+                <ForumIcon />
+              </Badge>
+            </IconButton>
+          )}
+          <IconButton
+            variant="floating"
+            onClick={() => setDiscussionsOpen(true)}
+          >
+            <Badge variant="dot" invisible={!discussionsUnread}>
+              <ForumIcon />
+            </Badge>
+          </IconButton>
+        </Stack>
       </Box>
 
       {/* ─── Footer ───────────────────────────────────────────────── */}
@@ -505,6 +526,16 @@ function RecordPageInner() {
         canComplete={Boolean(selectedSpeaker && passageAudio)}
         isCompletePrimary={!hasUnversionedRendering}
         onError={setSnackMsg}
+      />
+
+      <DiscussionsFlyout
+        open={discussionsOpen}
+        onClose={() => setDiscussionsOpen(false)}
+        passageId={passageId}
+        step={stepForRoute(location.pathname)?.id!}
+        projectId={projectId}
+        passageAudio={passageAudio?.blob}
+        onUnreadChange={setDiscussionsUnread}
       />
 
       {snackbarElement}
