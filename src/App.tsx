@@ -154,10 +154,10 @@ const theme = createTheme({
     },
     MuiBadge: {
       styleOverrides: {
-        badge: {
-          backgroundColor: PRIMARY_MAIN
-        }
-      }
+        dot: ({ theme }) => ({
+          backgroundColor: theme.palette.primary.main,
+        }),
+      },
     },
     MuiAccordion: {
       styleOverrides: {
