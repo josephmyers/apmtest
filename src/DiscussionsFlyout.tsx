@@ -716,6 +716,7 @@ function Discussion({
   const [loading, setLoading] = useState(false);
   const [replyText, setReplyText] = useState("");
   const [replyAudio, setReplyAudio] = useState<Blob | null>(null);
+  const root = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (discussion.expanded) toggle();
@@ -746,7 +747,10 @@ function Discussion({
       getDiscussionMessages(token, discussion.id)
         .then(setMessages)
         .catch(() => setMessages([]))
-        .finally(() => setLoading(false));
+        .finally(() => {
+          setLoading(false);
+          root.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        });
     }
     
     if (discussion.unread) {
@@ -787,7 +791,7 @@ function Discussion({
   const showSecondLine = showLocation || hasCategory;
 
   return (
-    <Paper sx={{ borderRadius: 2 }}>
+    <Paper ref={root} sx={{ borderRadius: 2 }}>
       <Box
         onClick={toggle}
         sx={{
