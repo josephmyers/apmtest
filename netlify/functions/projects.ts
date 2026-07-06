@@ -66,7 +66,18 @@ export default handle(async (req: Request) => {
     for (const p of passageRows) {
       const sectionId = p.section_id as number;
       const list = passagesBySection.get(sectionId) || [];
-      list.push(p);
+      list.push({
+        id: p.id,
+        sectionId: p.section_id,
+        reference: p.reference,
+        description: p.description,
+        sort_order: p.sort_order,
+        audioKey: p.audio_key ?? null,
+        unversionedRendering: p.unversioned_rendering ?? null,
+        speaker: p.speaker ?? null,
+        current_step: p.current_step,
+        createdAt: p.created_at,
+      });
       passagesBySection.set(sectionId, list);
     }
     const sections = sectionRows.map((s) => ({
