@@ -1,3 +1,5 @@
+import { clipAudio } from "./audioUtils";
+
 const API_BASE = "/.netlify/functions";
 
 interface AuthResponse {
@@ -915,12 +917,41 @@ export interface PassageVersion {
 
 // ─── Discussions ──────────────────────────────────────────────────────────
 
+/**
+ * A reference to one linkable audio source. Extend with new kinds as needed;
+ * each kind maps to an existing authorized fetcher in fetchLinkSourceAudio().
+ */
+export type AudioLinkSource =
+  | { kind: "version"; versionId: number };
+  // future: { kind: "replacement"; replacementId: number }, etc.
+
 /** A reference from a message to a selected range of some other audio. */
 export interface MessageAudioLink {
-  audioKey: string;
+  source: AudioLinkSource;
   label: string;
   start: number;
   end: number;
+}
+
+/**
+ * Resolve a link to its playable snippet: fetch the source (one case per kind) and
+ * clip it to the link's range. Returns null when the source is gone or the clip is
+ * empty.
+ */
+export async function resolveLinkAudio(
+  token: string,
+  link: MessageAudioLink,
+): Promise<Blob | null> {
+  const { source, start, end } = link;
+  let blob: Blob | null = null;
+  switch (source.kind) {
+    case "version":
+      blob = await fetchVersionAudio(token, source.versionId);
+      break;
+  }
+  if (!blob) return null;
+  const clip = await clipAudio(blob, start, end);
+  return clip.size > 0 ? clip : null;
 }
 
 /** Thread metadata for the list view; messages are fetched separately. */

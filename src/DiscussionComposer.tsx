@@ -1,13 +1,7 @@
 import { useRef, useState } from "react";
 import {
   Box,
-  Button,
   CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
   IconButton,
   Stack,
   TextField,
@@ -18,6 +12,10 @@ import CloseIcon from "@mui/icons-material/Close";
 import SendIcon from "@mui/icons-material/Send";
 import AttachmentIcon from '@mui/icons-material/Attachment';
 import MiniAudioPlayer from "./MiniAudioPlayer";
+import RadialAudioPlayer from "./RadialAudioPlayer";
+import LinkAudioDialog from "./LinkAudioDialog";
+import { useResolvedLinks } from "./useResolvedLinks";
+import type { MessageAudioLink } from "./api";
 import {
   VoiceRecorder,
   type RecorderPhase,
@@ -29,19 +27,28 @@ interface DiscussionComposerProps {
   onTextChange: (text: string) => void;
   audio: Blob | null;
   onAudioChange: (audio: Blob | null) => void;
+  links: MessageAudioLink[];
+  onLinksChange: (links: MessageAudioLink[]) => void;
+  passageId: number;
+  projectId: number;
   placeholder?: string;
   /** If provided, enables a Send button */
   onSend?: () => void;
 }
 
 /**
- * Messaging-style content composer, supporting mutually exclusive text and audio.
+ * Messaging-style content composer, supporting mutually exclusive text and audio,
+ * plus any number of linked-audio attachments.
  */
 export default function DiscussionComposer({
   text,
   onTextChange,
   audio,
   onAudioChange,
+  links,
+  onLinksChange,
+  passageId,
+  projectId,
   placeholder = "",
   onSend,
 }: DiscussionComposerProps) {
@@ -49,6 +56,7 @@ export default function DiscussionComposer({
   const [recording, setRecording] = useState(false);
   const [phase, setPhase] = useState<RecorderPhase>("warming");
   const [linkOpen, setLinkOpen] = useState(false);
+  const clips = useResolvedLinks(links);
 
   if (recording) {
     return (
@@ -129,23 +137,32 @@ export default function DiscussionComposer({
         </Stack>
       )}
 
-      <Box>
+      {/* Draft linked-audio chips, then the link button at the far right. */}
+      <Stack direction="row" alignItems="center" flexWrap="wrap" gap={0.5}>
+        {clips === null ? (
+          <CircularProgress size={20} sx={{ m: 0.75 }} />
+        ) : (
+          links.map((_, i) => (
+            <RadialAudioPlayer
+              key={i}
+              audio={clips[i] ?? null}
+              size={24}
+              onRemove={() => onLinksChange(links.filter((_, idx) => idx !== i))}
+            />
+          ))
+        )}
         <IconButton size="small" aria-label="link audio" onClick={() => setLinkOpen(true)}>
-          <AttachmentIcon fontSize="small" sx={{rotate: "-45deg"}} />
+          <AttachmentIcon fontSize="small" sx={{ rotate: "-45deg" }} />
         </IconButton>
-      </Box>
+      </Stack>
 
-      <Dialog open={linkOpen} onClose={() => setLinkOpen(false)}>
-        <DialogTitle>Link audio</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            Linking a selected range of other audio isn’t available yet.
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setLinkOpen(false)}>Close</Button>
-        </DialogActions>
-      </Dialog>
+      <LinkAudioDialog
+        open={linkOpen}
+        onClose={() => setLinkOpen(false)}
+        passageId={passageId}
+        projectId={projectId}
+        onLink={(link) => onLinksChange([...links, link])}
+      />
     </Stack>
   );
 }

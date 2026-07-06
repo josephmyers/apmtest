@@ -33,7 +33,6 @@ import CloseIcon from "@mui/icons-material/Close";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
-import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import { useAuth } from "./AuthContext";
 import {
   getTeamMembers,
@@ -58,6 +57,7 @@ import RadialAudioPlayer from "./RadialAudioPlayer";
 import { clipAudio } from "./audioUtils";
 import { formatTime } from "./formatTime";
 import DiscussionComposer from "./DiscussionComposer";
+import { useResolvedLinks } from "./useResolvedLinks";
 import EmailAvatar from "./EmailAvatar";
 import { getStepById } from "./steps";
 
@@ -173,6 +173,7 @@ export default function DiscussionsFlyout({
   const [category, setCategory] = useState("");
   const [text, setText] = useState("");
   const [audio, setAudio] = useState<Blob | null>(null);
+  const [links, setLinks] = useState<MessageAudioLink[]>([]);
 
   const shownDiscussions = discussions
     .filter((d) => d.resolved === showResolved)
@@ -258,8 +259,6 @@ export default function DiscussionsFlyout({
   const getUserId = (email: string) =>
     members.find((m) => m.email === email)?.userId ?? null;
 
-  // ─── Form ───────────────────────────────────────────────────────────────
-
   const openCreate = (range = selection) => {
     setEditingId(null);
     setTopic(range ? `${formatTenths(range.start)} – ${formatTenths(range.end)}` : "");
@@ -267,6 +266,7 @@ export default function DiscussionsFlyout({
     setCategory("");
     setText("");
     setAudio(null);
+    setLinks([]);
     setView("form");
   };
 
@@ -301,7 +301,7 @@ export default function DiscussionsFlyout({
         updateDiscussionState(discussion);
       } else {
         const content: MessageContent = audio ? { audio } : { text: text.trim() };
-        const { discussion } = await createDiscussion(token, passageId, step, fields, content);
+        const { discussion } = await createDiscussion(token, passageId, step, fields, content, links);
         loadList(discussion.id);
       }
       setView("list");
@@ -309,8 +309,6 @@ export default function DiscussionsFlyout({
       /* surfaced elsewhere; keep the form open */
     }
   };
-
-  // ─── Row actions ──────────────────────────────────────────────────────────
 
   const closeMenu = () => setMenu(null);
 
@@ -348,8 +346,6 @@ export default function DiscussionsFlyout({
 
   const updateDiscussionState = (discussion: Discussion) =>
     setDiscussions((prev) => prev.map((x) => (x.id === discussion.id ? discussion : x)));
-
-  // ─── Render ───────────────────────────────────────────────────────────────
 
   const headerTitle =
     view === "form"
@@ -476,6 +472,10 @@ export default function DiscussionsFlyout({
                 onTextChange={setText}
                 audio={audio}
                 onAudioChange={setAudio}
+                links={links}
+                onLinksChange={setLinks}
+                passageId={passageId}
+                projectId={projectId!}
                 placeholder="Discussion"
               />
             )}
@@ -505,6 +505,7 @@ export default function DiscussionsFlyout({
                   currentUserId={user?.id ?? null}
                   currentPassageId={passageId}
                   currentStep={step}
+                  projectId={projectId!}
                   getPassageAudio={getPassageAudio}
                   onMenu={(anchorEl, discussion) => setMenu({ anchorEl, discussion })}
                   onRead={markRead}
@@ -698,6 +699,7 @@ function Discussion({
   currentUserId,
   currentPassageId,
   currentStep,
+  projectId,
   getPassageAudio,
   onMenu,
   onRead,
@@ -707,6 +709,7 @@ function Discussion({
   currentUserId: number | null;
   currentPassageId: number;
   currentStep: number;
+  projectId: number;
   getPassageAudio: (passageId: number) => Promise<Blob | null>;
   onMenu: (anchorEl: HTMLElement, d: Discussion) => void;
   onRead: (id: number) => void;
@@ -716,6 +719,7 @@ function Discussion({
   const [loading, setLoading] = useState(false);
   const [replyText, setReplyText] = useState("");
   const [replyAudio, setReplyAudio] = useState<Blob | null>(null);
+  const [replyLinks, setReplyLinks] = useState<MessageAudioLink[]>([]);
   const root = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -765,11 +769,12 @@ function Discussion({
     if (!token || !canSend) return;
     const content: MessageContent = replyAudio ? { audio: replyAudio } : { text: replyText.trim() };
     try {
-      const { message } = await createDiscussionMessage(token, discussion.id, content);
+      const { message } = await createDiscussionMessage(token, discussion.id, content, replyLinks);
       const appended = replyAudio ? { ...message, audio: replyAudio } : message;
       setMessages((prev) => [...(prev ?? []), appended]);
       setReplyText("");
       setReplyAudio(null);
+      setReplyLinks([]);
     } catch {
       /* keep the draft */
     }
@@ -922,6 +927,10 @@ function Discussion({
               onTextChange={setReplyText}
               audio={replyAudio}
               onAudioChange={setReplyAudio}
+              links={replyLinks}
+              onLinksChange={setReplyLinks}
+              passageId={discussion.passageId}
+              projectId={projectId}
               onSend={sendReply}
             />
           </Box>
@@ -947,9 +956,10 @@ function MessageRow({
   onDelete: () => void;
 }) {
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
+  const linkClips = useResolvedLinks(message.links);
   return (
     <Box sx={{ flex: 1, minWidth: 0, ml: !isTopicAuthor ? "24px !important" : undefined }}>
-      <Stack direction="row" alignItems="center" spacing={1} sx={{mb: .5}}>
+      <Stack direction="row" alignItems="center" spacing={1}>
         <EmailAvatar email={message.authorEmail} />
         <Typography variant="caption" noWrap sx={{ fontWeight: 600, minWidth: 0 }}>
           {isOwn ? "Me" : message.authorEmail}
@@ -998,33 +1008,24 @@ function MessageRow({
         </Box>
       )}
       {message.links.length > 0 && (
-        <Stack direction="row" alignItems="center" flexWrap="wrap" gap={1} sx={{ mt: 0.5 }}>
-          <Typography variant="body2" sx={{ fontStyle: "italic" }}>
+        <Stack direction="row" alignItems="center" flexWrap="wrap" gap={1} sx={{ justifyContent: "end", mt: 0.5 }}>
+          <Typography variant="caption" sx={{ fontStyle: "italic" }}>
             Linked audio:
           </Typography>
-          {message.links.map((l, i) => (
-            <LinkedAudioButton key={i} link={l} />
-          ))}
+          {linkClips === null ? (
+            <CircularProgress size={20} />
+          ) : (
+            message.links.map((_, i) => (
+              <RadialAudioPlayer
+                key={i}
+                audio={linkClips[i] ?? null}
+                size={24}
+                errorTooltip="The original audio has been deleted."
+              />
+            ))
+          )}
         </Stack>
       )}
     </Box>
-  );
-}
-
-// ─── Linked-audio placeholder ───────────────────────────────────────────────
-// A round play button mirroring RadialAudioPlayer's resting look. Disabled for
-// now — it becomes a real player once fetching another passage's audio by key
-// is wired up (link creation is still stubbed, so this rarely renders yet).
-function LinkedAudioButton({ link }: { link: MessageAudioLink }) {
-  return (
-    <IconButton
-      size="small"
-      disabled
-      aria-label={`linked audio ${link.label}`}
-      title={`${link.label} ${formatTime(link.start)}–${formatTime(link.end)}`}
-      sx={{ border: 2, width: 34, height: 34 }}
-    >
-      <PlayArrowIcon fontSize="small" />
-    </IconButton>
   );
 }
