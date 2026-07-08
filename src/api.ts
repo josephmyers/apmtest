@@ -1142,7 +1142,8 @@ export async function createDiscussionMessage(
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "Failed to post message");
-  return data;
+  const audio = "audio" in content ? content.audio : null;
+  return { message: { ...data.message, audio } };
 }
 
 export async function updateDiscussionMessage(
@@ -1160,7 +1161,8 @@ export async function updateDiscussionMessage(
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "Failed to update message");
-  return data;
+  const audio = "audio" in content ? content.audio : null;
+  return { message: { ...data.message, audio } };
 }
 
 export async function deleteDiscussionMessage(

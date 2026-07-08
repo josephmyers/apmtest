@@ -44,6 +44,7 @@ import {
   markDiscussionRead,
   getDiscussionMessages,
   createDiscussionMessage,
+  updateDiscussionMessage,
   deleteDiscussionMessage,
   type TeamMember,
   type Discussion,
@@ -770,8 +771,7 @@ function Discussion({
     const content: MessageContent = replyAudio ? { audio: replyAudio } : { text: replyText.trim() };
     try {
       const { message } = await createDiscussionMessage(token, discussion.id, content, replyLinks);
-      const appended = replyAudio ? { ...message, audio: replyAudio } : message;
-      setMessages((prev) => [...(prev ?? []), appended]);
+      setMessages((prev) => [...(prev ?? []), message]);
       setReplyText("");
       setReplyAudio(null);
       setReplyLinks([]);
@@ -788,6 +788,18 @@ function Discussion({
     } catch {
       /* ignore */
     }
+  };
+
+  // Persist an edit emitted by the edit dialog, then swap the updated message
+  // into the list. Throws on failure so the dialog stays open.
+  const saveMessage = async (
+    id: number,
+    content: MessageContent,
+    links: MessageAudioLink[],
+  ) => {
+    if (!token) return;
+    const { message } = await updateDiscussionMessage(token, id, content, links);
+    setMessages((prev) => (prev ?? []).map((x) => (x.id === message.id ? message : x)));
   };
 
   const showLocation =
@@ -914,6 +926,9 @@ function Discussion({
                   message={m}
                   isOwn={m.authorId === currentUserId}
                   isTopicAuthor={m.authorId === messages[0].authorId}
+                  passageId={discussion.passageId}
+                  projectId={projectId}
+                  onSave={(content, links) => saveMessage(m.id, content, links)}
                   onDelete={() => removeMessage(m)}
                 />
               ))}
@@ -947,15 +962,22 @@ function MessageRow({
   canDelete,
   isOwn,
   isTopicAuthor,
+  passageId,
+  projectId,
+  onSave,
   onDelete,
 }: {
   message: DiscussionMessage;
   canDelete: boolean;
   isOwn: boolean;
   isTopicAuthor: boolean;
+  passageId: number;
+  projectId: number;
+  onSave: (content: MessageContent, links: MessageAudioLink[]) => Promise<void>;
   onDelete: () => void;
 }) {
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
   const linkClips = useResolvedLinks(message.links);
   return (
     <Box sx={{ flex: 1, minWidth: 0, ml: !isTopicAuthor ? "24px !important" : undefined }}>
@@ -982,7 +1004,14 @@ function MessageRow({
               open={menuAnchor !== null}
               onClose={() => setMenuAnchor(null)}
             >
-              <MenuItem onClick={() => setMenuAnchor(null)}>Edit</MenuItem>
+              <MenuItem
+                onClick={() => {
+                  setMenuAnchor(null);
+                  setEditOpen(true);
+                }}
+              >
+                Edit
+              </MenuItem>
               {canDelete && (
                 <MenuItem
                   onClick={() => {
@@ -1026,6 +1055,73 @@ function MessageRow({
           )}
         </Stack>
       )}
+
+      {editOpen && (
+        <MessageEditDialog
+          message={message}
+          passageId={passageId}
+          projectId={projectId}
+          onSave={onSave}
+          onClose={() => setEditOpen(false)}
+        />
+      )}
     </Box>
+  );
+}
+
+// ─── Edit-message dialog ─────────────────────────────────────────────────────
+
+function MessageEditDialog({
+  message,
+  passageId,
+  projectId,
+  onSave,
+  onClose,
+}: {
+  message: DiscussionMessage;
+  passageId: number;
+  projectId: number;
+  onSave: (content: MessageContent, links: MessageAudioLink[]) => Promise<void>;
+  onClose: () => void;
+}) {
+  const [text, setText] = useState(message.body ?? "");
+  const [audio, setAudio] = useState<Blob | null>(message.audio);
+  const [links, setLinks] = useState<MessageAudioLink[]>(message.links);
+
+  const canSave = text.trim() !== "" || audio !== null;
+
+  const handleSave = async () => {
+    if (!canSave) return;
+    const content: MessageContent = audio ? { audio } : { text: text.trim() };
+    try {
+      await onSave(content, links);
+      onClose();
+    } catch {
+      /* keep the dialog open */
+    }
+  };
+
+  return (
+    <Dialog open onClose={onClose} fullWidth maxWidth="xs">
+      <DialogTitle>Edit Message</DialogTitle>
+      <DialogContent sx={{ pt: 1 }}>
+        <DiscussionComposer
+          text={text}
+          onTextChange={setText}
+          audio={audio}
+          onAudioChange={setAudio}
+          links={links}
+          onLinksChange={setLinks}
+          passageId={passageId}
+          projectId={projectId}
+        />
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Cancel</Button>
+        <Button variant="primary" disabled={!canSave} onClick={handleSave}>
+          Save
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 }
