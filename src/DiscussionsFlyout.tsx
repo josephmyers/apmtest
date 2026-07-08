@@ -52,18 +52,25 @@ import {
   type MessageContent,
   type MessageAudioLink,
 } from "./api";
-import { AudioPlayer } from "./AudioPlayer";
+import { AudioPlayer, type AudioPlayerHandle } from "./AudioPlayer";
 import MiniAudioPlayer from "./MiniAudioPlayer";
 import RadialAudioPlayer from "./RadialAudioPlayer";
 import { clipAudio } from "./audioUtils";
-import { formatTime } from "./formatTime";
+import {
+  formatTime,
+  parseTimeRange,
+  rangeLabel,
+  applyRangeToText,
+  formatShortDateTime,
+  type TimeRange,
+} from "./formatTime";
 import DiscussionComposer from "./DiscussionComposer";
 import { useResolvedLinks } from "./useResolvedLinks";
 import EmailAvatar from "./EmailAvatar";
 import { getStepById } from "./steps";
 
 interface DiscussionsFlyoutProps {
-  open: boolean | { start: number; end: number };
+  open: boolean | TimeRange;
   onClose: () => void;
   passageId: number;
   step: number;
@@ -80,32 +87,6 @@ const SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: "oldest", label: "Oldest First" },
 ];
 
-// Format a time (in seconds) to a tenth of a second, e.g. 75.36 → "1:15.4".
-// Used to seed a new discussion's topic from the selected range.
-const formatTenths = (seconds: number): string => {
-  const m = Math.floor(seconds / 60);
-  const s = (seconds - m * 60).toFixed(1).padStart(4, "0");
-  return `${m}:${s}`;
-};
-
-// Parse a clock-style timestamp ("M:SS", "M:SS.s", or "H:MM:SS[.s]") to seconds,
-// or null when the text isn't such a timestamp (a bare number won't match).
-const parseClockTime = (raw: string): number | null => {
-  if (!/^\d+(:\d{1,2})+(\.\d+)?$/.test(raw)) return null;
-  return raw.split(":").reduce((acc, part) => acc * 60 + parseFloat(part), 0);
-};
-
-// Interpret a topic shaped like "start – end" (e.g. "1:15.4 – 1:20.0", however
-// the dash is typed) as a time range.
-const parseTimeRange = (topic: string): { start: number; end: number } | null => {
-  const parts = topic.split(/\s*[-–—]\s*/);
-  if (parts.length !== 2) return null;
-  const start = parseClockTime(parts[0].trim());
-  const end = parseClockTime(parts[1].trim());
-  if (start === null || end === null || start >= end) return null;
-  return { start, end };
-};
-
 // Deterministic swatch color for a passage+step: every discussion from the same
 // passage+step shares one color. Hue is hashed from the key; fixed saturation +
 // lightness keep the colors harmonious (never garish) however many appear.
@@ -114,25 +95,6 @@ const passageStepColor = (passageId: number, step: number): string => {
   let hash = 0;
   for (let i = 0; i < key.length; i++) hash = (hash * 31 + key.charCodeAt(i)) | 0;
   return `hsl(${Math.abs(hash) % 360}, 60%, 50%)`;
-};
-
-// A message's timestamp: clock time for today (e.g. "10:55 AM"), otherwise the
-// date too (e.g. "Jun 17, 10:55 AM", or with the year when it isn't this one).
-const formatMessageTime = (iso: string): string => {
-  const d = new Date(iso);
-  const now = new Date();
-  const time = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-  const sameDay =
-    d.getFullYear() === now.getFullYear() &&
-    d.getMonth() === now.getMonth() &&
-    d.getDate() === now.getDate();
-  if (sameDay) return time;
-  const date = d.toLocaleDateString([], {
-    month: "short",
-    day: "numeric",
-    ...(d.getFullYear() !== now.getFullYear() ? { year: "numeric" } : {}),
-  });
-  return `${date}, ${time}`;
 };
 
 /**
@@ -153,7 +115,8 @@ export default function DiscussionsFlyout({
   const [discussions, setDiscussions] = useState<Discussion[]>([]);
   const [loadingList, setLoadingList] = useState(false);
   const [members, setMembers] = useState<TeamMember[]>([]);
-  const [selection, setSelection] = useState<{ start: number; end: number } | null>(null);
+  const [selection, setSelection] = useState<TimeRange | null>(null);
+  const audioPlayerRef = useRef<AudioPlayerHandle>(null);
   // Open row-actions menu: the anchor element + the discussion it acts on.
   const [menu, setMenu] = useState<{ anchorEl: HTMLElement; discussion: Discussion } | null>(null);
   const [sortBy, setSortBy] = useState<SortKey>("oldest");
@@ -262,13 +225,14 @@ export default function DiscussionsFlyout({
 
   const openCreate = (range = selection) => {
     setEditingId(null);
-    setTopic(range ? `${formatTenths(range.start)} – ${formatTenths(range.end)}` : "");
+    setTopic(range ? rangeLabel(range) : "");
     setAssignee("");
     setCategory("");
     setText("");
     setAudio(null);
     setLinks([]);
     setView("form");
+    audioPlayerRef.current?.updateSelection(range);
   };
 
   const openEdit = (d: Discussion) => {
@@ -279,6 +243,7 @@ export default function DiscussionsFlyout({
     setText("");
     setAudio(null);
     setView("form");
+    audioPlayerRef.current?.updateSelection(parseTimeRange(d.topic));
   };
 
   const canSubmit =
@@ -413,14 +378,19 @@ export default function DiscussionsFlyout({
         </Stack>
 
         {passageAudio && (
-          <Box sx={{ mx: 1, mb: 1, p: 0.5, borderColor: "divider", borderWidth: 1, borderStyle: "solid", borderRadius: 2, display: view === "list" ? "block" : "none" }}>
+          <Box sx={{ mx: 1, mb: 1, p: 0.5, borderColor: "divider", borderWidth: 1, borderStyle: "solid", borderRadius: 2 }}>
             <AudioPlayer
+              ref={audioPlayerRef}
               audioSource={passageAudio}
               height={48}
               enableDragSelection
               enableZoom={false}
               showUndo={false}
-              onSelectionChange={(sel) => setSelection(sel)}
+              onSelectionChange={(sel) => {
+                setSelection(sel);
+                // In the form, selecting or clearing a range adds/removes it in the topic.
+                if (view === "form") setTopic((t) => applyRangeToText(t, sel));
+              }}
               formatTimeDisplay={(t, d) => `${formatTime(t)} / ${formatTime(d || 0)}`}
             />
           </Box>
@@ -987,7 +957,7 @@ function MessageRow({
           {isOwn ? "Me" : message.authorEmail}
         </Typography>
         <Typography variant="caption" color="text.secondary" sx={{ flexShrink: 0 }}>
-          {formatMessageTime(message.createdAt)}
+          {formatShortDateTime(message.createdAt)}
         </Typography>
         {isOwn && (
           <>
