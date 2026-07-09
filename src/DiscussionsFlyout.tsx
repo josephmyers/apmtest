@@ -139,6 +139,23 @@ export default function DiscussionsFlyout({
   const [audio, setAudio] = useState<Blob | null>(null);
   const [links, setLinks] = useState<MessageAudioLink[]>([]);
 
+  const [discussionsWithUnsentMessagesById, setDiscussionsWithUnsentMessagesById] = useState<Set<number>>(new Set());
+  const [confirmClose, setConfirmClose] = useState(false);
+  const onUnsentChanged = useCallback((id: number, hasDraft: boolean) => {
+    setDiscussionsWithUnsentMessagesById((prev) => {
+      if (prev.has(id) === hasDraft) return prev;
+      const next = new Set(prev);
+      if (hasDraft) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }, []);
+
+  const requestClose = () => {
+    if (discussionsWithUnsentMessagesById.size > 0) setConfirmClose(true);
+    else onClose();
+  };
+
   const shownDiscussions = discussions
     .filter((d) => d.resolved === showResolved)
     .filter((d) => categoryFilter.size === 0 || categoryFilter.has(d.category))
@@ -326,7 +343,7 @@ export default function DiscussionsFlyout({
       open={!!open}
       ModalProps={{ keepMounted: true }}
       onClose={(_e, reason) => {
-        if (reason !== "escapeKeyDown") onClose();
+        if (reason !== "escapeKeyDown") requestClose();
       }}
       slotProps={{
         paper: {
@@ -370,7 +387,7 @@ export default function DiscussionsFlyout({
               <IconButton size="small" onClick={() => openCreate()}>
                 <AddIcon />
               </IconButton>
-              <IconButton size="small" onClick={onClose}>
+              <IconButton size="small" onClick={requestClose}>
                 <CloseIcon />
               </IconButton>
             </>
@@ -480,6 +497,7 @@ export default function DiscussionsFlyout({
                   getPassageAudio={getPassageAudio}
                   onMenu={(anchorEl, discussion) => setMenu({ anchorEl, discussion })}
                   onRead={markRead}
+                  onUnsentChanges={onUnsentChanged}
                 />
               ))}
             </Stack>
@@ -578,6 +596,26 @@ export default function DiscussionsFlyout({
         </MenuItem>
       </Menu>
 
+      <Dialog open={confirmClose} onClose={() => setConfirmClose(false)} fullWidth maxWidth="xs">
+        <DialogTitle>Confirm Close</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2">
+            You have unsent messages. Are you sure you want to close?
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button variant='primary' onClick={() => setConfirmClose(false)}>Stay Open</Button>
+          <Button
+            onClick={() => {
+              setConfirmClose(false);
+              onClose();
+            }}
+          >
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       {categoryDialogOpen && (
         <CategoryFilterDialog
           options={categoryOptions}
@@ -674,6 +712,7 @@ function Discussion({
   getPassageAudio,
   onMenu,
   onRead,
+  onUnsentChanges
 }: {
   discussion: Discussion;
   token: string | null;
@@ -684,6 +723,7 @@ function Discussion({
   getPassageAudio: (passageId: number) => Promise<Blob | null>;
   onMenu: (anchorEl: HTMLElement, d: Discussion) => void;
   onRead: (id: number) => void;
+  onUnsentChanges: (id: number, hasDraft: boolean) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [messages, setMessages] = useState<DiscussionMessage[] | null>(null);
@@ -735,6 +775,10 @@ function Discussion({
   };
 
   const canSend = replyText.trim() !== "" || replyAudio !== null;
+
+  useEffect(() => onUnsentChanges(discussion.id, canSend), [canSend, discussion.id, onUnsentChanges]);
+  // Clear on unmount, i.e. resolve and delete
+  useEffect(() => () => onUnsentChanges(discussion.id, false), [discussion.id, onUnsentChanges]);
 
   const sendReply = async () => {
     if (!token || !canSend) return;
