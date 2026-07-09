@@ -86,7 +86,7 @@ export default function DiscussionComposer({
   }
 
   const sendButton = onSend ? (
-    <IconButton variant="outlined" onClick={onSend}>
+    <IconButton variant="primary" onClick={onSend} sx={{borderRadius: "8px"}}>
       <SendIcon />
     </IconButton>
   ) : null;
