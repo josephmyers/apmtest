@@ -403,6 +403,7 @@ function QAPrepPageInner() {
             flexDirection: "column",
             overflow: "auto",
             px: 2,
+            pb: 12,
           }}
         >
           <List dense disablePadding sx={{ mt: 1 }}>
