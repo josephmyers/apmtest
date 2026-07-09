@@ -14,6 +14,7 @@ interface RadialAudioPlayerProps {
   /** When set, render as a removable chip (subtle background + an X button). */
   onRemove?: () => void;
   errorTooltip?: string;
+  variant?: "primary";
 }
 
 /**
@@ -26,6 +27,7 @@ export default function RadialAudioPlayer({
   size = 38,
   onRemove,
   errorTooltip = "Audio unavailable.",
+  variant,
 }: RadialAudioPlayerProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const handleRef = useRef<AudioHandle | null>(null);
@@ -150,6 +152,7 @@ export default function RadialAudioPlayer({
           onClick={toggle}
           size="small"
           disabled={disabled}
+          variant={variant}
           sx={{ width: size, height: size, border: playing ? 0 : 2 }}
         >
           {playing ? <PauseIcon /> : <PlayArrowIcon />}

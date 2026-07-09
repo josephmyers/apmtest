@@ -81,6 +81,7 @@ function QAPageInner() {
   const [questionsDialogOpen, setQuestionsDialogOpen] = useState(false);
   // Question ids whose prompt the user has started playing (page lifetime).
   const [hasListenedToQuestion, setHasListenedToQuestion] = useState<Set<number>>(new Set());
+  const [questionPlaying, setQuestionPlaying] = useState(false);
 
 
   // Init
@@ -294,9 +295,15 @@ function QAPageInner() {
               <RadialAudioPlayer
                 audio={currentQuestion.audio}
                 onPlayingChange={(playing) => {
+                  setQuestionPlaying(playing);
                   if (!playing) markQuestionListened();
                 }}
                 disabled={playDisabled}
+                variant={
+                  !questionPlaying && !hasListenedToQuestion.has(currentQuestion.id)
+                    ? "primary"
+                    : undefined
+                }
               />
               <IconButton
                 onClick={() => goToQuestion(currentIndex + 1)}
