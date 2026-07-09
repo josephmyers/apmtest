@@ -158,26 +158,22 @@ export interface AudioMarker {
 const GRACE_PX = 10;
 const DEFAULT_MARKER_COLOR = "#868686c5";
 
-function graceSec(ws: WaveSurfer, container: HTMLDivElement | null): number {
-  const dur = ws.getDuration();
-  if (!dur) return 0;
-  const pxPerSec =
-    ws.options.minPxPerSec > 0
-      ? ws.options.minPxPerSec
-      : (container?.clientWidth ?? 0) / dur;
-  return pxPerSec > 0 ? GRACE_PX / pxPerSec : 0;
-}
-
+/**
+ * Nearest marker drawn within GRACE_PX on-screen pixels of the click, or undefined.
+ */
 function nearestMarkerWithin(
   markers: AudioMarker[],
-  t: number,
-  grace: number,
+  clickXPercent: number,
+  durationInSec: number,
+  waveformWidthPx: number,
 ): number | undefined {
+  const clickPx = clickXPercent * waveformWidthPx;
   let best: number | undefined;
   let bestD = Infinity;
   for (const m of markers) {
-    const d = Math.abs(m.time - t);
-    if (d <= grace && d < bestD) {
+    const markerPx = (m.time / durationInSec) * waveformWidthPx;
+    const d = Math.abs(markerPx - clickPx);
+    if (d <= GRACE_PX && d < bestD) {
       best = m.time;
       bestD = d;
     }
@@ -736,13 +732,16 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
       const ws = wsRef.current;
       if (!ws) return;
       return ws.on("click", (relX: number) => {
-        const t = relX * ws.getDuration();
+        const duration = ws.getDuration();
+        const waveformWidth = ws.getWrapper().getBoundingClientRect().width;
+
         const marker = nearestMarkerWithin(
           markersRef.current ?? [],
-          t,
-          graceSec(ws, containerRef.current),
+          relX,
+          duration,
+          waveformWidth,
         );
-        onWaveformClick(t, marker);
+        onWaveformClick(relX * duration, marker);
       });
     }, [onWaveformClick]);
 
