@@ -133,7 +133,7 @@ function SortableQuestionRow({
           audio={q.audio}
           label={
             <Stack direction="row" alignItems="center" spacing={0.5}>
-              <Typography variant="body2" noWrap>
+              <Typography variant="body2" noWrap sx={{ minWidth: 0 }}>
                 {q.title}
               </Typography>
               <IconButton size="small" aria-label="edit question" onClick={onEdit}>

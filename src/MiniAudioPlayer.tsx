@@ -110,7 +110,7 @@ export default function MiniAudioPlayer({ audio, label }: MiniAudioPlayerProps) 
           <PlayArrowIcon fontSize="large" />
         )}
       </IconButton>
-      <Box sx={{ flex: 1 }}>
+      <Box sx={{ flex: 1, minWidth: 0 }}>
         <Stack direction="row" alignItems="center" spacing={1}>
           <Box sx={{ flex: 1, minWidth: 0 }}>{label}</Box>
           <Typography variant="body2" sx={{ flexShrink: 0 }}>
