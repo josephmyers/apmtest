@@ -302,24 +302,26 @@ function QAPrepPageInner() {
     passageAudioRef.current?.updateSelection(null);
   };
 
-  const addQuestionButton = (
-    <>
+  const timeDisplay = (
     <Typography variant="body2" sx={{ mb: 1 }}>
       {selection
         ? `${formatTime(selection.start)} - ${formatTime(selection.end)}`
         : formatTime(currentTime)}
     </Typography>
+  );
+  const addQuestionButton = (
     <Button
-      variant="primary"
+      variant={expandedGroupKey ? undefined : "primary"}
       fullWidth
       startIcon={<AddIcon />}
       sx={{ mb: 2 }}
       disabled={isAudioPlaying || !passageAudio}
       onClick={() => setAddQuestionOpen(true)}
     >
-        Add Question...
-      </Button>
-    </>
+      Add Question at {selection
+        ? `${formatTime(selection.start)} - ${formatTime(selection.end)}`
+        : formatTime(currentTime)}...
+    </Button>
   );
 
   return (
@@ -402,7 +404,7 @@ function QAPrepPageInner() {
               const expanded = expandedGroupKey === group.key;
               return (
                 <Fragment key={group.key}>
-                  {!expandedGroupKey && i === addButtonIndex && addQuestionButton}
+                  {!expandedGroupKey && i === addButtonIndex && timeDisplay && addQuestionButton}
                   <Paper
                     ref={expanded ? expandedRowRef : undefined}
                     elevation={1}
@@ -450,23 +452,14 @@ function QAPrepPageInner() {
                         </SortableContext>
                       </DndContext>
                       <Box sx={{ px: 2, py: 1 }}>
-                        <Button
-                          fullWidth
-                          startIcon={<AddIcon />}
-                          disabled={isAudioPlaying || !passageAudio}
-                          onClick={() => setAddQuestionOpen(true)}
-                        >
-                          Add Question...
-                        </Button>
+                        {addQuestionButton}
                       </Box>
                     </Collapse>
                   </Paper>
                 </Fragment>
               );
             })}
-            {!expandedGroupKey &&
-              addButtonIndex === groups.length &&
-              addQuestionButton}
+            {!expandedGroupKey && addButtonIndex === groups.length && timeDisplay && addQuestionButton}
           </List>
 
           {questions.length === 0 && !expandedGroupKey && (
