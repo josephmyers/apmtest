@@ -170,6 +170,7 @@ function QAPrepPageInner() {
   const [discussionsOpen, setDiscussionsOpen] = useState<boolean | { start: number; end: number }>(false);
   const [discussionsUnread, setDiscussionsUnread] = useState(false);
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [speaker, setSpeaker] = useState<string>("");
   const [expandedGroupKey, setExpandedGroupKey] = useState<string | null>(null);
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const isAudioPlaying = useIsAudioPlaying();
@@ -197,6 +198,12 @@ function QAPrepPageInner() {
       getQuestions(token, passage.id),
     ]).then(([blob, { versions }, qs]) => {
       setQuestions(qs);
+
+      const latestQuestion = qs.reduce<Question | null>(
+        (a, q) => (a && a.id > q.id ? a : q),
+        null,
+      );
+      setSpeaker(latestQuestion ? latestQuestion.name : passage.speaker ?? "");
 
       // Open the first "0 group" if present
       const zeroGroup = qs
@@ -520,9 +527,10 @@ function QAPrepPageInner() {
             selection ?? { start: currentTime, end: currentTime }
           }
           initialTitle={`Question ${questions.length + 1}`}
-          initialName={passage.speaker ?? ""}
+          initialName={speaker}
           onCancel={() => setAddQuestionOpen(false)}
           onContinue={async ({ title, name, selection: sel, audio }) => {
+            setSpeaker(name);
             try {
               const q = await saveQuestion(
                 token,
