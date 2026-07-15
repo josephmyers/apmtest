@@ -492,7 +492,7 @@ function SectionRow({
               <ListItemIcon>
                 <DeleteIcon fontSize="small" />
               </ListItemIcon>
-              <ListItemText>Delete...</ListItemText>
+              <ListItemText>Delete</ListItemText>
             </MenuItem>
           )}
         </Menu>
