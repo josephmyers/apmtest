@@ -7,6 +7,7 @@ import {
 import { Box, useTheme } from "@mui/material";
 import WaveSurfer from "wavesurfer.js";
 import RecordPlugin from "wavesurfer.js/dist/plugins/record";
+import { useCountdownGate } from "./CountdownBackdrop";
 
 export type RecorderPhase = "warming" | "recording";
 
@@ -23,14 +24,12 @@ interface VoiceRecorderProps {
   height?: number;
 }
 
-/** Mic warmup before recording, mirroring AudioPlayer */
-const WARMUP_MS = 1250;
-
 export const VoiceRecorder = forwardRef<VoiceRecorderHandle, VoiceRecorderProps>(
   ({ onComplete, onPhaseChange, height = 48 }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const recordRef = useRef<RecordPlugin | null>(null);
     const theme = useTheme();
+    const countdown = useCountdownGate();
 
     const onCompleteRef = useRef(onComplete);
     const onPhaseChangeRef = useRef(onPhaseChange);
@@ -71,12 +70,16 @@ export const VoiceRecorder = forwardRef<VoiceRecorderHandle, VoiceRecorderProps>
         try {
           onPhaseChangeRef.current?.("warming");
           await record.startMic();
-          await new Promise((r) => setTimeout(r, WARMUP_MS));
+          if (cancelled) return;
+          await countdown.start();
           if (cancelled) return;
           await record.startRecording();
           onPhaseChangeRef.current?.("recording");
         } catch {
-          if (!cancelled) onCompleteRef.current(null);
+          if (!cancelled) {
+            countdown.cancel();
+            onCompleteRef.current(null);
+          }
         }
       })();
 
@@ -88,17 +91,20 @@ export const VoiceRecorder = forwardRef<VoiceRecorderHandle, VoiceRecorderProps>
     }, []);
 
     return (
-      <Box
-        ref={containerRef}
-        sx={{
-          flex: 1,
-          minWidth: 0,
-          height,
-          bgcolor: "action.hover",
-          borderRadius: 1,
-          overflow: "hidden",
-        }}
-      />
+      <>
+        <Box
+          ref={containerRef}
+          sx={{
+            flex: 1,
+            minWidth: 0,
+            height,
+            bgcolor: "action.hover",
+            borderRadius: 1,
+            overflow: "hidden",
+          }}
+        />
+        {countdown.backdrop}
+      </>
     );
   },
 );

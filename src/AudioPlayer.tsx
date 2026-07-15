@@ -44,6 +44,7 @@ import {
   disableProgressSplit,
 } from "./waveformRenderer";
 import { audioManager, type AudioHandle } from "./audioManager";
+import { useCountdownGate } from "./CountdownBackdrop";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -234,6 +235,7 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
     const [playing, setPlaying] = useState(false);
     const [isRecording, setIsRecording] = useState(false);
     const [warmingUp, setWarmingUp] = useState(false);
+    const countdown = useCountdownGate();
     const [internalAudio, setInternalAudio] = useState<Blob | null>(
       audioSource ?? null,
     );
@@ -356,11 +358,18 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
       const rec = recordRef.current;
       if (!rec) return;
       setWarmingUp(true);
-      await rec.startMic();
-      await new Promise((r) => setTimeout(r, 1250));
-      setWarmingUp(false);
-      setIsRecording(true);
-      await rec.startRecording();
+      try {
+        await rec.startMic();
+        await countdown.start();
+        if (recordRef.current !== rec) return;
+        setWarmingUp(false);
+        setIsRecording(true);
+        await rec.startRecording();
+      } catch (err) {
+        countdown.cancel();
+        setWarmingUp(false);
+        throw err;
+      }
     };
     const stopRecording = () => {
       recordRef.current?.stopRecording();
@@ -985,6 +994,7 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
           />
         )}
         {children}
+        {countdown.backdrop}
       </Box>
     );
   },
