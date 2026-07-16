@@ -447,7 +447,7 @@ export default function DiscussionsFlyout({
               freeSolo
               size="small"
               options={categoryOptions.filter(Boolean)}
-              value={category}
+              value={category || null}
               onChange={(_e, v) => setCategory(v ?? "")}
               onInputChange={(_e, v) => setCategory(v)}
               renderInput={(params) => <TextField {...params} label="Category" fullWidth />}
