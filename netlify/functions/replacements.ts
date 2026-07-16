@@ -232,14 +232,14 @@ export default handle(async (req: Request) => {
 
     if (id) {
       await assertReplacementAccess(sql, user.userId, id);
-      const rows = await sql`SELECT audio_key, original, title, note FROM replacements WHERE id = ${id}`;
+      const rows = await sql`SELECT audio_key, original, title, note, passage_id FROM replacements WHERE id = ${id}`;
       if (rows.length > 0) {
         if (rows[0].audio_key) {
           await store.delete(rows[0].audio_key as string);
         }
         if (rows[0].original) {
           // If deleting the original, check for copies and make a copy the new original
-          const copies = await sql`SELECT id FROM replacements WHERE title = ${rows[0].title} AND note = ${rows[0].note} AND id != ${id} LIMIT 1`;
+          const copies = await sql`SELECT id FROM replacements WHERE passage_id = ${rows[0].passage_id} AND title = ${rows[0].title} AND note = ${rows[0].note} AND id != ${id} LIMIT 1`;
           if (copies.length > 0) {
             await sql`UPDATE replacements SET original = true WHERE id = ${copies[0].id}`;
           }
