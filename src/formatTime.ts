@@ -28,27 +28,39 @@ export interface TimeRange {
   end: number;
 }
 
-// Format a time (in seconds) as a clock time rounded to the nearest second,
-// e.g. 75.36 → "1:15".
+// Format a time (in seconds) as a clock time with tenth-of-a-second precision,
+// e.g. 75.36 → "1:15.4". The tenth is always written, so a label formatted here
+// parses back to the same time — these labels carry the range itself, not just
+// a rendering of it. Carrying in tenths keeps 59.97 at "1:00.0", not "0:60.0".
 export const formatClock = (seconds: number): string => {
-  const total = Math.floor(seconds);
+  const tenths = Math.round(seconds * 10);
+  const total = Math.floor(tenths / 10);
   const m = Math.floor(total / 60);
   const s = String(total % 60).padStart(2, "0");
-  return `${m}:${s}`;
+  return `${m}:${s}.${tenths % 10}`;
 };
 
-// Parse a clock-style timestamp ("M:SS" or "H:MM:SS") to seconds, or null when
-// the text isn't such a timestamp (a bare number won't match).
+// One clock-style timestamp: "M:SS" or "H:MM:SS", with an optional fraction on
+// the last part. Both regexes below are built from this so the grammar can't
+// drift between them — a time we can format but not parse back would silently
+// lose a discussion's range.
+const CLOCK_SRC = String.raw`\d+(?::\d{1,2})+(?:\.\d+)?`;
+const CLOCK_REGEX = new RegExp(String.raw`^${CLOCK_SRC}$`);
+
+// Parse a clock-style timestamp to seconds, or null when the text isn't one (a
+// bare number won't match). The fraction is optional, so a hand-typed "0:02"
+// parses as readily as a formatted "0:02.0".
 export const parseClockTime = (raw: string): number | null => {
-  if (!/^\d+(:\d{1,2})+$/.test(raw)) return null;
-  return raw.split(":").reduce((acc, part) => acc * 60 + parseInt(part, 10), 0);
+  if (!CLOCK_REGEX.test(raw)) return null;
+  return raw.split(":").reduce((acc, part) => acc * 60 + parseFloat(part), 0);
 };
 
 // A leading "start – end" range at the front of a string (however the dash is
 // typed), with the two clock times captured. Any text after the range — e.g.
 // "0:01 – 0:20 Creation Days" — is allowed and left untouched.
-const LEADING_RANGE_RE =
-  /^\s*(\d+(?::\d{1,2})+)\s*[-–—]\s*(\d+(?::\d{1,2})+)\s*/;
+const LEADING_RANGE_RE = new RegExp(
+  String.raw`^\s*(${CLOCK_SRC})\s*[-–—]\s*(${CLOCK_SRC})\s*`,
+);
 
 // Interpret a string's leading "start – end" range as a time range, whether the
 // range is the whole string ("1:15 – 1:20") or just its prefix
@@ -62,7 +74,7 @@ export const parseTimeRange = (text: string): TimeRange | null => {
   return { start, end };
 };
 
-// Format a time range as a "M:SS – M:SS" label.
+// Format a time range as a "M:SS.T – M:SS.T" label.
 export const rangeLabel = (range: TimeRange): string =>
   `${formatClock(range.start)} – ${formatClock(range.end)}`;
 
