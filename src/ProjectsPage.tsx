@@ -143,6 +143,7 @@ export default function ProjectsPage() {
         title={activeTeam.name}
         leftExtra={
           <IconButton
+            aria-label="manage team members"
             size="small"
             onClick={() => setMembersOpen(true)}
             title="Manage team members"
@@ -195,8 +196,12 @@ export default function ProjectsPage() {
           py: 3,
         }}
       >
-        <Button onClick={() => setAddOpen(true)}>Add Project</Button>
-        <Button onClick={() => navigate("/teams")}>Switch Teams</Button>
+        <Button aria-label="add project" onClick={() => setAddOpen(true)}>
+          Add Project
+        </Button>
+        <Button aria-label="switch teams" onClick={() => navigate("/teams")}>
+          Switch Teams
+        </Button>
       </Box>
 
       <TeamMembersDialog
@@ -257,7 +262,7 @@ function ProjectCard({
         borderRadius: 2,
       }}
     >
-      <CardActionArea onClick={onOpen}>
+      <CardActionArea aria-label={`${project.name} project`} onClick={onOpen}>
         <CardContent>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
             <MenuBookIcon />
@@ -273,6 +278,7 @@ function ProjectCard({
         </CardContent>
       </CardActionArea>
       <IconButton
+        aria-label={`${project.name} menu`}
         size="small"
         sx={{ position: "absolute", top: 8, right: 8 }}
         onClick={(e) => {
@@ -288,6 +294,7 @@ function ProjectCard({
         onClose={() => setMenuAnchor(null)}
       >
         <MenuItem
+          aria-label={`rename ${project.name}`}
           onClick={() => {
             setMenuAnchor(null);
             onRename();
@@ -299,6 +306,7 @@ function ProjectCard({
           <ListItemText>Rename...</ListItemText>
         </MenuItem>
         <MenuItem
+          aria-label={`admin ${project.name}`}
           onClick={() => {
             setMenuAnchor(null);
             onAdmin();
@@ -310,6 +318,7 @@ function ProjectCard({
           <ListItemText>Admin</ListItemText>
         </MenuItem>
         <MenuItem
+          aria-label={`delete ${project.name}`}
           onClick={() => {
             setMenuAnchor(null);
             onDelete();
@@ -348,6 +357,7 @@ function ProjectAdminDialog({
         <FormControlLabel
           control={
             <Checkbox
+              aria-label="structure edits allowed"
               checked={structureEditsAllowed}
               onChange={(e) => {
                 if (!project) return;
@@ -362,7 +372,9 @@ function ProjectAdminDialog({
         />
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Close</Button>
+        <Button aria-label="close admin" onClick={onClose}>
+          Close
+        </Button>
       </DialogActions>
     </Dialog>
   );
@@ -402,6 +414,7 @@ function NameDialog({
       <DialogTitle>{title}</DialogTitle>
       <DialogContent>
         <TextField
+          aria-label={`${label} input`}
           autoFocus
           margin="dense"
           fullWidth
@@ -417,8 +430,15 @@ function NameDialog({
         />
       </DialogContent>
       <DialogActions>
-        <Button onClick={onCancel}>Cancel</Button>
-        <Button variant="primary" onClick={submit} disabled={!trimmed}>
+        <Button aria-label={`cancel ${title.toLowerCase()}`} onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button
+          aria-label={`confirm ${title.toLowerCase()}`}
+          variant="primary"
+          onClick={submit}
+          disabled={!trimmed}
+        >
           Confirm
         </Button>
       </DialogActions>

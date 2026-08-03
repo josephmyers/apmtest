@@ -250,6 +250,7 @@ export default function AddReplacementDialog({
       </DialogTitle>
       <DialogContent>
         <AudioPlayer
+          label="replacement passage"
           ref={passagePlayerRef}
           audioSource={previewAudio}
           height={60}
@@ -411,6 +412,7 @@ export default function AddReplacementDialog({
 
         {/* ─── Replacement waveform ──────────────────────────────── */}
         <AudioPlayer
+          label="replacement"
           ref={replacementPlayerRef}
           audioSource={
             (selectedHistoryId

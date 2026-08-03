@@ -337,6 +337,7 @@ function RecordPageInner() {
         {/* Hidden file input */}
         <input
           ref={fileInputRef}
+          aria-label="audio file input"
           type="file"
           accept="audio/*"
           hidden
@@ -350,6 +351,7 @@ function RecordPageInner() {
         {/* Select Speaker & Load from File */}
         <Box sx={{ display: "flex", gap: 1, p: 2 }}>
           <Button
+            aria-label="select speaker"
             variant={selectedSpeaker ? undefined : "primary"}
             startIcon={<PersonOutlineIcon />}
             sx={{ width: "100%", maxWidth: 260 }}
@@ -360,6 +362,7 @@ function RecordPageInner() {
             {selectedSpeaker || "Select Speaker..."}
           </Button>
           <Button
+            aria-label="load from file"
             startIcon={busy ? <CircularProgress size={18} /> : <FolderOpenIcon />}
             sx={{ width: "100%", maxWidth: 260 }}
             disabled={busy || !selectedSpeaker || recording}
@@ -380,6 +383,7 @@ function RecordPageInner() {
             onRecordingComplete={handleRecordingComplete}
             menuItems={
               <MenuItem
+                aria-label="replace ai option"
                 onClick={() => goToReplaceAI()}
               >
                 <ListItemIcon>
@@ -406,6 +410,7 @@ function RecordPageInner() {
         {versions.length > 1 && (
           <Box sx={{ px: 2, pt: 1 }}>
             <Button
+              aria-label="versions"
               startIcon={<InsertDriveFileOutlinedIcon />}
               onClick={() => setVersionsDialogOpen(true)}
             >
@@ -418,6 +423,7 @@ function RecordPageInner() {
         {(hasUnversionedReplacements || selection) && (
           <Box sx={{ display: "flex", justifyContent: "center", pt: 6 }}>
             <Button
+              aria-label="replace ai"
               startIcon={<GraphicEqIcon />}
               variant={hasUnversionedRendering ? "primary" : undefined}
               onClick={() => goToReplaceAI({ initialSelection: selection })}
@@ -440,6 +446,8 @@ function RecordPageInner() {
         >
           {audioInitialized && (!passageAudio ? (
             <Box
+              role="button"
+              aria-label="record"
               onClick={handleRecordToggle}
               sx={{
                 width: 80,
@@ -462,6 +470,7 @@ function RecordPageInner() {
             </Box>
           ) : (
             <Button
+              aria-label="rerecord"
               onClick={() => {
                 if (selection) {
                   setSnackMsg("Recording is not supported while there is a selected time range.");
@@ -498,6 +507,7 @@ function RecordPageInner() {
         <Stack spacing={1} sx={{ position: "absolute", bottom: 16, right: 16 }}>
           {selection && (
             <IconButton
+              aria-label="add discussion at selection"
               variant="floating"
               onClick={() => setDiscussionsOpen(selection)}
             >
@@ -511,6 +521,7 @@ function RecordPageInner() {
             </IconButton>
           )}
           <IconButton
+            aria-label="discussions"
             variant="floating"
             onClick={() => setDiscussionsOpen(true)}
           >

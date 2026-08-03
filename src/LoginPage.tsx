@@ -90,6 +90,7 @@ export default function LoginPage() {
 
           <Box component="form" onSubmit={handleSubmit}>
             <TextField
+              aria-label="username"
               label="Email"
               type="email"
               fullWidth
@@ -99,6 +100,7 @@ export default function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
             />
             <TextField
+              aria-label="password"
               label="Password"
               type="password"
               fullWidth
@@ -109,6 +111,7 @@ export default function LoginPage() {
               inputProps={{ minLength: 6 }}
             />
             <Button
+              aria-label="login"
               type="submit"
               variant="contained"
               fullWidth

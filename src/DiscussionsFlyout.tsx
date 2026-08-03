@@ -397,6 +397,7 @@ export default function DiscussionsFlyout({
         {passageAudio && (
           <Box sx={{ mx: 1, mb: 1, p: 0.5, borderColor: "divider", borderWidth: 1, borderStyle: "solid", borderRadius: 2 }}>
             <AudioPlayer
+              label="discussion"
               ref={audioPlayerRef}
               audioSource={passageAudio}
               height={48}

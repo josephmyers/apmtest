@@ -75,7 +75,12 @@ export default function SwitchTeamsPage() {
               Create a team to get started, or ask someone to add you to their team by your email.
             </Typography>
             <Box>
-              <Button onClick={() => setCreateOpen(true)}>Create a Team</Button>
+              <Button
+                aria-label="create first team"
+                onClick={() => setCreateOpen(true)}
+              >
+                Create a Team
+              </Button>
             </Box>
           </Box>
         ) : (
@@ -84,6 +89,7 @@ export default function SwitchTeamsPage() {
               {teams.map((t) => (
                 <ListItemButton
                   key={t.id}
+                  aria-label={`${t.name} team`}
                   selected={t.id === activeTeamId}
                   onClick={() => handlePick(t.id)}
                   sx={{ borderRadius: 2, my: 1, bgcolor: (theme) => t.id === activeTeamId ? theme.palette.primary.light + " !important" : "#f5f5f5" }}
@@ -96,7 +102,12 @@ export default function SwitchTeamsPage() {
               ))}
             </List>
             <Box sx={{ display: "flex", justifyContent: "center", py: 2 }}>
-              <Button onClick={() => setCreateOpen(true)}>Create New Team</Button>
+              <Button
+                aria-label="create new team"
+                onClick={() => setCreateOpen(true)}
+              >
+                Create New Team
+              </Button>
             </Box>
           </>
         )}
@@ -139,6 +150,7 @@ function CreateTeamDialog({
       <DialogTitle>Create Team</DialogTitle>
       <DialogContent>
         <TextField
+          aria-label="Team name input"
           autoFocus
           margin="dense"
           fullWidth
@@ -155,6 +167,7 @@ function CreateTeamDialog({
       </DialogContent>
       <DialogActions>
         <Button
+          aria-label="cancel create team"
           onClick={() => {
             setValue("");
             onCancel();
@@ -162,7 +175,12 @@ function CreateTeamDialog({
         >
           Cancel
         </Button>
-        <Button variant="primary" onClick={submit} disabled={!trimmed}>
+        <Button
+          aria-label="confirm create team"
+          variant="primary"
+          onClick={submit}
+          disabled={!trimmed}
+        >
           Create
         </Button>
       </DialogActions>

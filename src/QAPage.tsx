@@ -342,6 +342,7 @@ function QAPageInner() {
             <Box sx={{ mt: 1 }}>
               <AudioPlayer
                 key={currentQuestion.id}
+                label="answer"
                 ref={answerRef}
                 audioSource={answers.get(currentQuestion.id)?.audio ?? undefined}
                 height={60}

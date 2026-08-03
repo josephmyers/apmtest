@@ -143,6 +143,12 @@ export interface AudioPlayerProps {
 
   /** Fires on every waveform click. `marker` is the nearest marker timestamp within ~10px, if any. */
   onWaveformClick?: (timestamp: number, marker?: number) => void;
+
+  /**
+   * Prefixes every aria-label inside the player (e.g. "passage play").
+   * Override when a screen shows more than one player, so the labels stay unique.
+   */
+  label?: string;
 }
 
 export interface AudioMarker {
@@ -216,6 +222,7 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
       topRowLabel,
       markers,
       onWaveformClick,
+      label = "passage",
     },
     ref,
   ) => {
@@ -866,14 +873,14 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
           {/* Left button: Record/Stop when showRecordButton and no audio (or warming up / actively recording), otherwise Play/Pause */}
           {showRecordButton && (!hasLoadedAudio || isRecording || warmingUp) ? (
             warmingUp ? (
-              <IconButton disabled sx={{ p: 0, px: "5.5px" }} aria-label="warming up">
+              <IconButton disabled sx={{ p: 0, px: "5.5px" }} aria-label={`${label} warming up`}>
                 <CircularProgress size={24} />
               </IconButton>
             ) : isRecording ? (
               <IconButton
                 onClick={handleStopRec}
                 sx={{ p: 0 }}
-                aria-label="stop recording"
+                aria-label={`${label} stop recording`}
               >
                 <StopIcon fontSize="large" sx={{ color: "error.main" }} />
               </IconButton>
@@ -881,7 +888,7 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
               <IconButton
                 onClick={handleStartRec}
                 sx={{ p: 0 }}
-                aria-label="start recording"
+                aria-label={`${label} start recording`}
               >
                 <FiberManualRecordIcon
                   fontSize="large"
@@ -894,7 +901,7 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
               onClick={handlePlayToggle}
               disabled={!hasLoadedAudio}
               sx={{ p: 0 }}
-              aria-label={playing ? "pause" : "play"}
+              aria-label={playing ? `${label} pause` : `${label} play`}
             >
               {playing ? (
                 <PauseIcon fontSize="large" />
@@ -911,7 +918,7 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
             <IconButton
               disabled={undoStack.length === 0}
               size="small"
-              aria-label="undo"
+              aria-label={`${label} undo`}
               sx={{ ml: "12px !important" }}
               onClick={handleUndo}
             >
@@ -922,7 +929,7 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
             <IconButton
               disabled={!selection}
               size="small"
-              aria-label="cut"
+              aria-label={`${label} cut`}
               sx={{ ml: "12px !important" }}
               onClick={handleCutClick}
             >
@@ -933,7 +940,7 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
             <IconButton
               disabled={!hasLoadedAudio || isRecording || warmingUp}
               size="small"
-              aria-label="insert silence"
+              aria-label={`${label} insert silence`}
               sx={{ ml: "12px !important" }}
               onClick={handleInsertSilenceClick}
             >
@@ -941,7 +948,12 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
             </IconButton>
           )}
           {hasMenu && (
-            <IconButton size="small" sx={{ ml: "8px !important" }} onClick={handleMenuOpen}>
+            <IconButton
+              aria-label={`${label} audio menu`}
+              size="small"
+              sx={{ ml: "8px !important" }}
+              onClick={handleMenuOpen}
+            >
               <MoreVertIcon />
             </IconButton>
           )}
@@ -955,6 +967,7 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
           >
             {showTrash && (
               <MenuItem
+                aria-label={`${label} reset audio`}
                 disabled={!hasLoadedAudio || isRecording || warmingUp}
                 onClick={() => {
                   handleMenuClose();
@@ -973,7 +986,7 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
 
         <Box
           ref={containerRef}
-          aria-label="Waveform"
+          aria-label={`${label} waveform`}
           sx={{
             minHeight: height,
             bgcolor: "action.hover",

@@ -99,6 +99,7 @@ export default function AddQuestionDialog({
       <DialogTitle sx={{px: 2}}>{dialogTitle}</DialogTitle>
       <DialogContent sx={{px: 2}}>
         <AudioPlayer
+          label="question passage"
           audioSource={passageAudio}
           height={60}
           stickySelection={currentSelection}
@@ -115,6 +116,7 @@ export default function AddQuestionDialog({
 
         <Box sx={{ mt: 8 }}>
           <AudioPlayer
+            label="question"
             ref={questionPlayerRef}
             audioSource={questionAudio ?? undefined}
             height={60}

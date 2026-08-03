@@ -201,6 +201,7 @@ export default function LinkAudioDialog({
                 </Box>
               ) : blob ? (
                 <AudioPlayer
+                  label="link audio"
                   key={selectedKey}
                   audioSource={blob}
                   height={60}

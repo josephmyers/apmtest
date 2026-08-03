@@ -52,7 +52,7 @@ export default function PageHeader({
     >
       <Toolbar sx={{ gap: 1 }}>
         {leftIcon === "back" ? (
-          <IconButton size="small" onClick={onLeftClick}>
+          <IconButton aria-label="back" size="small" onClick={onLeftClick}>
             <ArrowBackIcon />
           </IconButton>
         ) : (
@@ -60,6 +60,8 @@ export default function PageHeader({
             component="img"
             src={appIcon}
             alt="App icon"
+            aria-label="logo"
+            role={onLeftClick ? "button" : undefined}
             onClick={onLeftClick}
             sx={{
               width: 32,
@@ -75,10 +77,11 @@ export default function PageHeader({
           {leftExtra}
         </Box>
         {rightActions}
-        <IconButton size="small">
+        <IconButton aria-label="help" size="small">
           <HelpOutlineIcon />
         </IconButton>
         <IconButton
+          aria-label="account"
           size="small"
           onClick={(e) => setAccountAnchor(e.currentTarget)}
         >
@@ -89,8 +92,8 @@ export default function PageHeader({
           open={Boolean(accountAnchor)}
           onClose={() => setAccountAnchor(null)}
         >
-          <MenuItem disabled>{user?.email!}</MenuItem>
-          <MenuItem onClick={() => { setAccountAnchor(null); logout(); }}>Log Out</MenuItem>
+          <MenuItem aria-label="account email" disabled>{user?.email!}</MenuItem>
+          <MenuItem aria-label="log out" onClick={() => { setAccountAnchor(null); logout(); }}>Log Out</MenuItem>
         </Menu>
       </Toolbar>
       {racetrack && <Racetrack />}

@@ -117,7 +117,7 @@ export default function Dashboard() {
         onLeftClick={() => navigate("/projects")}
         title={project?.name ?? "Audio Project Manager"}
         rightActions={
-          <Button variant="primary" size="small">
+          <Button aria-label="export" variant="primary" size="small">
             Export
           </Button>
         }
@@ -140,12 +140,21 @@ export default function Dashboard() {
               fullWidth
               value={activeTab}
               onChange={(e: { target: { value: string } }) => setActiveTab(e.target.value as TabId)}
+              inputProps={{ "aria-label": "tab selector" }}
               sx={{bgcolor: "#fff"}}
             >
-              <MenuItem value="overview">Project Overview</MenuItem>
-              <MenuItem value="audio">Audio</MenuItem>
-              <MenuItem value="assignments">Assignments</MenuItem>
-              <MenuItem value="transcriptions">Transcriptions</MenuItem>
+              <MenuItem aria-label="overview option" value="overview">
+                Project Overview
+              </MenuItem>
+              <MenuItem aria-label="audio option" value="audio">
+                Audio
+              </MenuItem>
+              <MenuItem aria-label="assignments option" value="assignments">
+                Assignments
+              </MenuItem>
+              <MenuItem aria-label="transcriptions option" value="transcriptions">
+                Transcriptions
+              </MenuItem>
             </Select>
           </Box>
         ) : (
@@ -157,8 +166,9 @@ export default function Dashboard() {
             textColor="primary"
             indicatorColor="primary"
           >
-            <Tab label="Project Overview" value="overview" />
+            <Tab aria-label="overview tab" label="Project Overview" value="overview" />
             <Tab
+              aria-label="audio tab"
               label={
                 <span>
                   Audio
@@ -174,6 +184,7 @@ export default function Dashboard() {
               value="audio"
             />
             <Tab
+              aria-label="assignments tab"
               label={
                 <span>
                   Assignments
@@ -189,6 +200,7 @@ export default function Dashboard() {
               value="assignments"
             />
             <Tab
+              aria-label="transcriptions tab"
               label={
                 <span>
                   Transcriptions
@@ -325,7 +337,11 @@ function ProjectOverviewTab({
           <Typography variant="body1" align="center">
             Select where the new passage should go.
           </Typography>
-          <Button variant="toast" onClick={() => setAddPassageMode(false)}>
+          <Button
+            aria-label="done adding passages"
+            variant="toast"
+            onClick={() => setAddPassageMode(false)}
+          >
             DONE
           </Button>
         </Box>
@@ -353,6 +369,7 @@ function ProjectOverviewTab({
           }}
         >
           <Button
+            aria-label="add section"
             onClick={handleAddSection}
             disabled={addPassageMode}
             sx={{ width: 132, flex: "0 0 auto" }}
@@ -360,6 +377,7 @@ function ProjectOverviewTab({
             Add Section
           </Button>
           <Button
+            aria-label="add passage"
             variant={addPassageMode ? "primary" : undefined}
             onClick={() => setAddPassageMode((prev) => !prev)}
             sx={{ width: 132, flex: "0 0 auto" }}
@@ -465,6 +483,7 @@ function SectionRow({
 
         {!addPassageMode && (
           <IconButton
+            aria-label={`${section.name} menu`}
             size="small"
             onClick={(e) => setMenuAnchor(e.currentTarget)}
           >
@@ -477,6 +496,7 @@ function SectionRow({
           onClose={() => setMenuAnchor(null)}
         >
           <MenuItem
+            aria-label={`rename ${section.name}`}
             onClick={() => {
               setMenuAnchor(null);
               setRenameOpen(true);
@@ -488,7 +508,10 @@ function SectionRow({
             <ListItemText>Rename...</ListItemText>
           </MenuItem>
           {structureEditsAllowed && (
-            <MenuItem onClick={handleDelete}>
+            <MenuItem
+              aria-label={`delete ${section.name}`}
+              onClick={handleDelete}
+            >
               <ListItemIcon>
                 <DeleteIcon fontSize="small" />
               </ListItemIcon>
@@ -669,11 +692,12 @@ function PassageCard({
             <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
               {passage.reference}
             </Typography>
-            <IconButton size="small">
+            <IconButton aria-label={`play ${passage.reference}`} size="small">
               <PlayCircleOutlineIcon />
             </IconButton>
           </Box>
           <IconButton
+            aria-label={`${passage.reference} menu`}
             size="small"
             onClick={(e) => setMenuAnchor(e.currentTarget)}
             disabled={disabled}
@@ -686,6 +710,7 @@ function PassageCard({
             onClose={() => setMenuAnchor(null)}
           >
             <MenuItem
+              aria-label={`rename ${passage.reference}`}
               onClick={() => {
                 setMenuAnchor(null);
                 setRenameOpen(true);
@@ -698,6 +723,7 @@ function PassageCard({
             </MenuItem>
             {structureEditsAllowed && (
               <MenuItem
+                aria-label={`delete ${passage.reference}`}
                 onClick={() => {
                   setMenuAnchor(null);
                   setConfirmDeleteOpen(true);
@@ -737,8 +763,17 @@ function PassageCard({
               </Typography>
             </DialogContent>
             <DialogActions>
-              <Button onClick={() => setConfirmDeleteOpen(false)}>Cancel</Button>
-              <Button variant="primary" onClick={handleDelete}>
+              <Button
+                aria-label={`cancel delete ${passage.reference}`}
+                onClick={() => setConfirmDeleteOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                aria-label={`confirm delete ${passage.reference}`}
+                variant="primary"
+                onClick={handleDelete}
+              >
                 Delete
               </Button>
             </DialogActions>
@@ -759,6 +794,7 @@ function PassageCard({
           </Typography>
         </Box>
         <Button
+          aria-label={`open ${passage.reference}`}
           fullWidth
           variant="primary"
           sx={{
@@ -813,6 +849,7 @@ function RenameDialog({
       <DialogTitle>{title}</DialogTitle>
       <DialogContent>
         <TextField
+          aria-label={`${label} input`}
           autoFocus
           margin="dense"
           fullWidth
@@ -828,8 +865,15 @@ function RenameDialog({
         />
       </DialogContent>
       <DialogActions>
-        <Button onClick={onCancel}>Cancel</Button>
-        <Button variant="primary" onClick={handleConfirm} disabled={!trimmedValue}>
+        <Button aria-label={`cancel ${title.toLowerCase()}`} onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button
+          aria-label={`confirm ${title.toLowerCase()}`}
+          variant="primary"
+          onClick={handleConfirm}
+          disabled={!trimmedValue}
+        >
           Confirm
         </Button>
       </DialogActions>
