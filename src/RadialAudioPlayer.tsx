@@ -7,7 +7,11 @@ import CloseIcon from "@mui/icons-material/Close";
 import { audioManager, type AudioHandle } from "./audioManager";
 
 interface RadialAudioPlayerProps {
-  audio: Blob | null;
+  /**
+   * A resolved blob, or a loader invoked on the first play — the loader runs at most once per
+   * mount, so pass a `key` if the underlying audio identity can change.
+   */
+  audio: Blob | null | (() => Promise<Blob | null>);
   onPlayingChange?: (playing: boolean) => void;
   disabled?: boolean;
   size?: number;
@@ -15,6 +19,7 @@ interface RadialAudioPlayerProps {
   onRemove?: () => void;
   errorTooltip?: string;
   variant?: "primary";
+  ariaLabel?: string;
 }
 
 /**
@@ -28,13 +33,19 @@ export default function RadialAudioPlayer({
   onRemove,
   errorTooltip = "Audio unavailable.",
   variant,
+  ariaLabel,
 }: RadialAudioPlayerProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const handleRef = useRef<AudioHandle | null>(null);
   const [playing, setPlaying] = useState(false);
   // 0–100 playback progress.
   const [progress, setProgress] = useState(0);
-  const [loadError, setLoadError] = useState(false);
+  const [loadState, setLoadState] = useState<"idle" | "loading" | "error">("idle");
+  // What a loader resolved to, once it has run.
+  const [loadedAudio, setLoadedAudio] = useState<Blob | null>(null);
+
+  const lazy = typeof audio === "function";
+  const blob = lazy ? loadedAudio : audio;
 
   const onPlayingChangeRef = useRef(onPlayingChange);
   useEffect(() => {
@@ -44,13 +55,13 @@ export default function RadialAudioPlayer({
   useEffect(() => {
     setPlaying(false);
     setProgress(0);
-    setLoadError(false);
-    if (!audio) {
+    setLoadState("idle");
+    if (!blob) {
       audioRef.current = null;
       handleRef.current = null;
       return;
     }
-    const url = URL.createObjectURL(audio);
+    const url = URL.createObjectURL(blob);
     const el = new Audio(url);
     audioRef.current = el;
     const handle: AudioHandle = {
@@ -79,12 +90,15 @@ export default function RadialAudioPlayer({
       audioManager.release(handle);
       onPlayingChangeRef.current?.(false);
     };
-    const onError = () => setLoadError(true);
+    const onError = () => setLoadState("error");
     el.addEventListener("timeupdate", onTime);
     el.addEventListener("play", onPlay);
     el.addEventListener("pause", onPause);
     el.addEventListener("ended", onEnded);
     el.addEventListener("error", onError);
+
+    // A loader only ever runs from a click on play, so start as soon as its blob is ready.
+    if (lazy) audioManager.play(handle);
 
     return () => {
       el.pause();
@@ -97,18 +111,29 @@ export default function RadialAudioPlayer({
       URL.revokeObjectURL(url);
       audioRef.current = null;
     };
-  }, [audio]);
+  }, [blob, lazy]);
 
-  const toggle = () => {
+  const toggle = async () => {
     const el = audioRef.current;
     const handle = handleRef.current;
-    if (!el || !handle) return;
+    if (!el || !handle) {
+      if (typeof audio !== "function" || loadState !== "idle") return;
+      setLoadState("loading");
+      try {
+        const loaded = await audio();
+        if (loaded) setLoadedAudio(loaded);
+        else setLoadState("error");
+      } catch {
+        setLoadState("error");
+      }
+      return;
+    }
     if (el.paused) audioManager.play(handle);
     else audioManager.stop();
   };
 
   let button;
-  if (audio === null || loadError) {
+  if ((!lazy && audio === null) || loadState === "error") {
     button = (
       <Tooltip title={errorTooltip}>
         <span>
@@ -151,11 +176,18 @@ export default function RadialAudioPlayer({
         <IconButton
           onClick={toggle}
           size="small"
-          disabled={disabled}
+          aria-label={ariaLabel}
+          disabled={disabled || loadState === "loading"}
           variant={variant}
           sx={{ width: size, height: size, border: playing ? 0 : 2 }}
         >
-          {playing ? <PauseIcon /> : <PlayArrowIcon />}
+          {loadState === "loading" ? (
+            <CircularProgress size={size / 2} thickness={5} />
+          ) : playing ? (
+            <PauseIcon />
+          ) : (
+            <PlayArrowIcon />
+          )}
         </IconButton>
       </Box>
     );

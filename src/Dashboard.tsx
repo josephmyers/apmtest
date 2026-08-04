@@ -27,12 +27,12 @@ import {
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
-import PlayCircleOutlineIcon from "@mui/icons-material/PlayCircleOutline";
 import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
 import AddIcon from "@mui/icons-material/Add";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import { useAuth } from "./AuthContext";
 import PageHeader from "./PageHeader";
+import RadialAudioPlayer from "./RadialAudioPlayer";
 import {
   getProject,
   createSection,
@@ -41,6 +41,7 @@ import {
   deletePassage,
   renameSection,
   renamePassage,
+  fetchAudio,
   type Passage,
   type Project,
   type Section,
@@ -692,9 +693,14 @@ function PassageCard({
             <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
               {passage.reference}
             </Typography>
-            <IconButton aria-label={`play ${passage.reference}`} size="small">
-              <PlayCircleOutlineIcon />
-            </IconButton>
+            {passage.audioKey && token && (
+              <RadialAudioPlayer
+                audio={() => fetchAudio(token, passage.id)}
+                size={24}
+                ariaLabel={`play ${passage.reference}`}
+                errorTooltip="Could not load this recording."
+              />
+            )}
           </Box>
           <IconButton
             aria-label={`${passage.reference} menu`}

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Avatar,
   Backdrop,
@@ -16,12 +16,11 @@ import {
   useMediaQuery,
   useTheme,
 } from "@mui/material";
-import PlayCircleOutline from "@mui/icons-material/PlayCircleOutline";
-import StopCircleOutlinedIcon from "@mui/icons-material/StopCircleOutlined";
 import DownloadIcon from "@mui/icons-material/Download";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import { activateVersion, fetchVersionAudio, type PassageVersion } from "./api";
-import { audioManager, type AudioHandle } from "./audioManager";
+import { audioManager } from "./audioManager";
+import RadialAudioPlayer from "./RadialAudioPlayer";
 
 export interface UseVersionResult {
   version: PassageVersion;
@@ -59,10 +58,8 @@ export default function VersionsDialog({
   onGoToReplaceAI,
 }: VersionsDialogProps) {
   const [selectedAudioKey, setSelectedAudioKey] = useState<string>(activeAudioKey);
-  const [previewPlayingVersionId, setPreviewPlayingVersionId] = useState<number | null>(null);
   const [deletingVersionId, setDeletingVersionId] = useState<number | null>(null);
   const [isBusy, setIsBusy] = useState(false);
-  const previewAudioRef = useRef<HTMLAudioElement | null>(null);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
@@ -73,11 +70,11 @@ export default function VersionsDialog({
 
   useEffect(() => {
     if (open) return;
-    stop();
+    audioManager.stop();
   }, [open]);
 
   function handleDialogClose() {
-    stop();
+    audioManager.stop();
     onClose();
   }
 
@@ -87,7 +84,7 @@ export default function VersionsDialog({
 
     setIsBusy(true);
     try {
-      stop();
+      audioManager.stop();
       if (selectedAudioKey === activeAudioKey) {
         handleDialogClose();
         return;
@@ -120,49 +117,6 @@ export default function VersionsDialog({
     }
   }
 
-  async function togglePlayVersion(version: PassageVersion) {
-    if (!token) return;
-
-    if (previewPlayingVersionId === version.id) {
-      stop();
-      return;
-    }
-
-    try {
-      const blob = await fetchVersionAudio(token, version.id);
-      if (!blob) {
-        onMessage("Could not load audio for this version.");
-        return;
-      }
-
-      const url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
-      const handle: AudioHandle = {
-        play: () => audio.play(),
-        stop: () => {
-          audio.pause();
-          audio.currentTime = 0;
-        },
-      };
-      const cleanup = () => {
-        URL.revokeObjectURL(url);
-        if (previewAudioRef.current === audio) {
-          previewAudioRef.current = null;
-          setPreviewPlayingVersionId(null);
-        }
-        audioManager.release(handle);
-      };
-      audio.addEventListener("pause", cleanup);
-      audio.addEventListener("ended", cleanup);
-      previewAudioRef.current = audio;
-      setPreviewPlayingVersionId(version.id);
-      audioManager.play(handle);
-    } catch {
-      onMessage("Could not play this version.");
-      stop();
-    }
-  }
-
   function formatVersionDateTime(value: string) {
     const d = new Date(value);
     if (Number.isNaN(d.getTime())) return "Unknown date";
@@ -180,10 +134,6 @@ export default function VersionsDialog({
     const parts = name.trim().split(/\s+/);
     if (parts.length === 1) return parts[0][0]?.toUpperCase() ?? "?";
     return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
-  }
-
-  function stop() {
-    previewAudioRef.current?.pause();
   }
 
   async function download(version: PassageVersion) {
@@ -205,7 +155,7 @@ export default function VersionsDialog({
     if (deletingVersionId !== null || isBusy) return;
     setDeletingVersionId(version.id);
     try {
-      stop();
+      audioManager.stop();
       await onDeleteVersion(version);
       if (selectedAudioKey === version.audioKey) {
         const fallback = versions.find((v) => v.id !== version.id);
@@ -258,20 +208,15 @@ export default function VersionsDialog({
                       mb: 0.75,
                     }}
                   >
-                    <IconButton
-                      size="small"
-                      disabled={isBusy}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        togglePlayVersion(version);
-                      }}
-                    >
-                      {previewPlayingVersionId === version.id ? (
-                        <StopCircleOutlinedIcon />
-                      ) : (
-                        <PlayCircleOutline />
-                      )}
-                    </IconButton>
+                    <Box onClick={(event) => event.stopPropagation()}>
+                      <RadialAudioPlayer
+                        audio={() => fetchVersionAudio(token, version.id)}
+                        size={24}
+                        disabled={isBusy}
+                        ariaLabel={`play ${version.audioKey}`}
+                        errorTooltip="Could not load audio for this version."
+                      />
+                    </Box>
 
                     <Box sx={{ minWidth: 0 }}>
                       <Typography variant="subtitle2" sx={{ fontWeight: 700 }} noWrap>
