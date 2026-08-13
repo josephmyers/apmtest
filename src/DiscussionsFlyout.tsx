@@ -76,6 +76,7 @@ interface DiscussionsFlyoutProps {
   step: number;
   projectId?: number;
   passageAudio?: Blob;
+  markers?: number[];
   onUnreadChange?: (hasUnread: boolean) => void;
 }
 
@@ -107,6 +108,7 @@ export default function DiscussionsFlyout({
   step,
   projectId,
   passageAudio,
+  markers,
   onUnreadChange,
 }: DiscussionsFlyoutProps) {
   const { token, user, activeTeamId } = useAuth();
@@ -400,6 +402,7 @@ export default function DiscussionsFlyout({
               label="discussion"
               ref={audioPlayerRef}
               audioSource={passageAudio}
+              markers={markers}
               height={48}
               enableDragSelection
               enableZoom={false}

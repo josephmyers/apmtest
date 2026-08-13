@@ -515,6 +515,7 @@ function QAPrepPageInner() {
         step={stepForRoute(location.pathname)?.id!}
         projectId={projectId}
         passageAudio={passageAudio?.blob}
+        markers={[...new Set(groups.map((g) => g.start))]}
         onUnreadChange={setDiscussionsUnread}
       />
 
